@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MIDI Monitor — 入力モニター</title>
+  <meta name="description" content="MIDIキーボードを選択し、ノート、ベロシティ、コントロール情報をリアルタイム表示。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c7f36b'/%3E%3Cpath d='M8 8v16m8-16v16m8-16v16' stroke='%23191d17' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css"><script src="script.js" defer></script>
+</head>
+<body>
+<header><a class="brand" href="./"><span class="brand-icon">▥</span>MIDI<span class="brand-light">MONITOR</span></a><span class="header-label">INPUT WORKSPACE <span class="version">01</span></span></header>
+<main>
+  <div class="title-row"><span class="status" id="status">未接続</span></div>
+  <section class="connection panel" aria-labelledby="connection-title"><div><p class="eyebrow">01 / CONNECTION</p><h2 id="connection-title">入力デバイス</h2></div><div class="device-control"><label for="device">MIDIキーボード</label><select id="device" disabled><option value="">先にMIDIアクセスを許可してください</option></select></div><button class="primary" id="connect">MIDIに接続 <span>↗</span></button><p class="connection-help" id="message" role="status">キーボードを接続し「MIDIに接続」を押してください。</p></section>
+  <section class="monitor panel" aria-labelledby="monitor-title"><div class="section-heading"><div><p class="eyebrow">02 / LIVE INPUT</p><h2 id="monitor-title">ライブモニター</h2></div><span class="small-label"><i id="activity"></i> MIDI IN</span></div>
+    <div class="readouts"><div class="note-readout"><span class="metric-label">押している音</span><div class="note-display"><div id="note">—</div><span id="solfege" aria-label="ドレミの音名">—</span></div><span id="note-number">ノート入力を待っています</span></div><div class="metric"><span class="metric-label">VELOCITY</span><strong id="velocity">—</strong><div class="meter"><span id="velocity-bar"></span></div><span class="metric-foot">0 – 127</span></div><div class="metric"><span class="metric-label">CHANNEL</span><strong id="channel">—</strong><span class="metric-foot">1 – 16</span></div><div class="metric"><span class="metric-label">ACTIVE NOTES</span><strong id="active">0</strong><span class="metric-foot">同時に押している音</span></div></div>
+    <div class="keyboard-scroll"><div id="keyboard" class="keyboard" role="img" aria-label="受信中のノートを示す鍵盤、C2からC7"></div></div><div class="keyboard-footer"><span><span class="legend-dot"></span>押されている鍵盤</span><span>C2 — C7 · MIDI 36–96 <span class="muted">/ 中央のド = C4</span></span></div>
+  </section>
+  <section class="log panel" aria-labelledby="log-title">
+    <div class="section-heading"><div><p class="eyebrow">03 / MIDI STREAM</p><h2 id="log-title">受信ログ <span id="count">0</span></h2></div><button id="clear" class="secondary">ログをクリア</button></div>
+    <div class="table-scroll"><table><thead><tr><th>時刻</th><th>操作</th><th>CH</th><th>値</th></tr></thead><tbody id="events"></tbody></table><div id="empty"><span class="empty-icon">≋</span><p>まだMIDI情報を受信していません</p><span>デバイスを選択して、鍵盤やコントローラーを操作してください。</span></div></div>
+    <div class="log-footer"><span>最新100件 · 同期クロックなどの定期信号は省略</span><span id="total">受信合計 0 件</span></div>
+  </section>
+  <footer><span><span class="footer-dot"></span>ブラウザー内で処理 · MIDI送信なし</span><span>Web MIDI API <span class="muted">/</span> HTTPS・localhostで利用</span></footer>
+</main>
+</body></html>
