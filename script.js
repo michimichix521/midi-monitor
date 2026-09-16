@@ -1,6 +1,13 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const english = {
+  "サウンド": "Sound",
+  "音を鳴らす": "Play sound",
+  "音声を有効にする": "Enable audio",
+  "音声の準備ができました": "Audio ready",
+  "音声はオフです": "Audio is off",
+  "音声を有効にするボタンを押してください": "Click Enable audio to start sound",
+  "このブラウザーでは音声を開始できません": "Could not start audio in this browser",
   "入力デバイス": "Input device",
   "MIDIキーボード": "MIDI keyboard",
   "先にMIDIアクセスを許可してください": "Allow MIDI access first",
@@ -67,6 +74,117 @@ const noteName = n => names[n % 12] + (Math.floor(n / 12) - 1);
 const noteLabel = n => language === 'ja' ? `${noteName(n)}（${syllable(n)}）` : `${noteName(n)} (${syllable(n)})`;
 let access = null, input = null, total = 0, selectionVersion = 0, frame = 0, pulseTimer;
 const held = new Map(), history = [], keys = new Map();
+let audioContext = null, masterGain = null, audioFailed = false;
+const voices = new Map(), sustain = new Set(), bends = new Map();
+
+function renderAudioStatus() {
+  const key = !$('sound-enabled').checked ? '音声はオフです' : audioFailed ? 'このブラウザーでは音声を開始できません' :
+    audioContext?.state === 'running' ? '音声の準備ができました' : '音声を有効にするボタンを押してください';
+  $('audio-status').textContent = t(key);
+}
+
+// Start/resume inside a user gesture so browsers can allow audio playback.
+async function enableAudio() {
+  if (!$('sound-enabled').checked) return;
+  try {
+    if (!audioContext) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioContextClass();
+      masterGain = audioContext.createGain();
+      masterGain.gain.value = Number($('volume').value) / 100;
+      const compressor = audioContext.createDynamicsCompressor();
+      masterGain.connect(compressor);
+      compressor.connect(audioContext.destination);
+      audioContext.onstatechange = () => {
+        if (audioContext.state !== 'running') stopSound();
+        renderAudioStatus();
+      };
+    }
+    await audioContext.resume();
+    audioFailed = false;
+  } catch { audioFailed = true; }
+  renderAudioStatus();
+}
+
+function releaseVoice(key, immediate = false) {
+  const voice = voices.get(key);
+  if (!voice) return;
+  voices.delete(key);
+  const now = audioContext.currentTime;
+  voice.gain.gain.cancelScheduledValues(now);
+  voice.gain.gain.setTargetAtTime(0, now, immediate ? 0.004 : 0.04);
+  voice.oscillator.stop(now + (immediate ? 0.025 : 0.25));
+}
+
+function stopSound(channel = null) {
+  for (const [key, voice] of voices) if (channel === null || voice.channel === channel) releaseVoice(key, true);
+  if (channel === null) { sustain.clear(); bends.clear(); }
+  else { sustain.delete(channel); bends.delete(channel); }
+}
+
+function playNote(channel, note, velocity) {
+  if (!$('sound-enabled').checked || audioContext?.state !== 'running') return;
+  const key = `${channel}:${note}`;
+  releaseVoice(key, true);
+  // Bound resource use even if a controller fails to send Note Off.
+  if (voices.size >= 64) releaseVoice(voices.keys().next().value, true);
+  const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
+  oscillator.type = 'triangle';
+  oscillator.frequency.value = 440 * 2 ** ((note - 69) / 12);
+  oscillator.detune.value = bends.get(channel) || 0;
+  gain.gain.setValueAtTime(0, audioContext.currentTime);
+  gain.gain.linearRampToValueAtTime(0.14 * velocity / 127, audioContext.currentTime + 0.008);
+  oscillator.connect(gain); gain.connect(masterGain);
+  oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+  voices.set(key, {oscillator, gain, channel, released: false});
+  oscillator.start();
+}
+
+function receiveSound(data) {
+  const [s, a, b] = data, channel = (s & 15) + 1, type = s & 0xf0;
+  if (s === 255) { stopSound(); return; }
+  if (type === 0x90 && b > 0) { playNote(channel, a, b); return; }
+  if (type === 0x80 || type === 0x90) {
+    const key = `${channel}:${a}`, voice = voices.get(key);
+    if (voice && sustain.has(channel)) voice.released = true;
+    else releaseVoice(key);
+  }
+  if (type === 0xe0) {
+    // Fixed pitch-bend range: two semitones in either direction.
+    const cents = (((b << 7) | a) - 8192) / 8192 * 200;
+    bends.set(channel, cents);
+    for (const voice of voices.values()) if (voice.channel === channel) voice.oscillator.detune.setTargetAtTime(cents, audioContext.currentTime, 0.01);
+  }
+  if (type === 0xb0) {
+    if (a === 64) {
+      if (b >= 64) sustain.add(channel);
+      else {
+        sustain.delete(channel);
+        for (const [key, voice] of voices) if (voice.channel === channel && voice.released) releaseVoice(key);
+      }
+    }
+    if (a === 120 || a >= 123) stopSound(channel);
+    if (a === 121) {
+      sustain.delete(channel); bends.delete(channel);
+      for (const [key, voice] of voices) if (voice.channel === channel) {
+        if (voice.released) releaseVoice(key);
+        else voice.oscillator.detune.setTargetAtTime(0, audioContext.currentTime, 0.01);
+      }
+    }
+  }
+}
+
+$('enable-audio').addEventListener('click', () => { $('sound-enabled').checked = true; void enableAudio(); });
+$('sound-enabled').addEventListener('change', () => {
+  if ($('sound-enabled').checked) void enableAudio();
+  else { stopSound(); renderAudioStatus(); }
+});
+$('volume').addEventListener('input', () => {
+  $('volume-value').textContent = `${$('volume').value}%`;
+  if (masterGain) masterGain.gain.setTargetAtTime(Number($('volume').value) / 100, audioContext.currentTime, 0.02);
+});
+window.addEventListener('pagehide', () => stopSound());
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopSound(); });
 let whiteIndex = 0;
 for (let n = 36; n <= 96; n++) {
   const black = [1,3,6,8,10].includes(n % 12);
@@ -79,8 +197,9 @@ for (let n = 36; n <= 96; n++) {
 }
 function status(text, connected = false) { statusKey = text; $('status').textContent = t(text); $('status').classList.toggle('connected', connected); }
 function resetNotes() { held.clear(); $('active').textContent = '0'; keys.forEach(k => k.classList.remove('pressed')); $('note').textContent = '—'; $('solfege').textContent = '—'; $('note-number').textContent = t('ノート入力を待っています'); $('velocity').textContent = '—'; $('channel').textContent = '—'; $('velocity-bar').style.width = '0%'; }
-function detach() { if (input) { input.onmidimessage = null; input.close().catch(() => {}); } input = null; resetNotes(); }
+function detach() { stopSound(); if (input) { input.onmidimessage = null; input.close().catch(() => {}); } input = null; resetNotes(); }
 async function selectInput() {
+  void enableAudio();
   const version = ++selectionVersion;
   detach();
   const next = access?.inputs.get($('device').value);
@@ -106,6 +225,7 @@ function refreshDevices() {
   setMessage(devices.length ? '入力するMIDIキーボードを選択してください。' : 'MIDIキーボードを接続してください。接続すると自動で一覧に表示されます。');
 }
 $('connect').addEventListener('click', async () => {
+  void enableAudio();
   if (!window.isSecureContext) { setMessage('HTTPSまたはlocalhostで開いてください。'); return; }
   if (!navigator.requestMIDIAccess) { setMessage('このブラウザーはWeb MIDIに対応していません。ChromeやEdgeで開いてください。'); return; }
   $('connect').disabled = true;
@@ -131,6 +251,7 @@ function decode(data) {
 function receive(event) {
   if (!event.data?.length) return;
   const data = Array.from(event.data), entry = decode(data);
+  if (!document.hidden) receiveSound(data);
   const [s, n, v] = data, channel = (s & 15) + 1;
   if (entry.type === 'Note On' || entry.type === 'Note Off') {
     const key = `${channel}:${n}`;
@@ -203,6 +324,7 @@ function applyLanguage() {
   $('note-number').textContent = current ? `MIDI ${current.note} · ${t('押下中')}` : t('ノート入力を待っています');
   keys.forEach((key, n) => { key.title = `${noteLabel(n)} · MIDI ${n}`; const label = key.querySelector('span'); if (label) label.textContent = syllable(n); });
   renderLog();
+  renderAudioStatus();
 }
 $('language').addEventListener('change', () => {
   language = $('language').value === 'en' ? 'en' : 'ja';
