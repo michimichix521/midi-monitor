@@ -2,6 +2,8 @@
 
 A simple browser-based MIDI input monitor built with HTML, CSS, and JavaScript.
 
+Live site: [MIDI Monitor](https://michimichix521.github.io/midi-monitor/)
+
 - View notes, velocity, channels, and controller messages in real time.
 - Highlight held notes on a C2–C7 keyboard and inspect the latest 100 messages.
 - Switch between Japanese and English using the menu in the header. Your language choice is saved in your browser.
@@ -17,6 +19,8 @@ No installation or build is needed. This app monitors input only; it does not pl
 ## 日本語
 
 HTML・CSS・JavaScriptで作成した、ブラウザーで使えるシンプルなMIDI入力モニターです。
+
+公開サイト: [MIDI Monitor](https://michimichix521.github.io/midi-monitor/)
 
 - ノート、ベロシティ、チャンネル、コントローラー情報をリアルタイム表示。
 - C2〜C7の鍵盤で押下中の音を表示し、最新100件のログを確認。
