@@ -7,6 +7,7 @@ Live site: [MIDI Monitor](https://michimichix521.github.io/midi-monitor/)
 - View notes, velocity, channels, and controller messages in real time.
 - Highlight held notes on a C2–C7 keyboard and inspect the latest 100 messages.
 - Hear a simple synth sound with chords, velocity, sustain, and pitch bend (±2 semitones). Toggle sound and adjust the volume.
+- Choose from 9 synthesized tones: soft synth, piano-style, electric piano-style, organ, bell, strings-style, bass, lead, and 8-bit. Your selection is saved.
 - Switch between Japanese and English using the menu in the header. Your language choice is saved in your browser.
 
 ## Usage
@@ -26,6 +27,7 @@ HTML・CSS・JavaScriptで作成した、ブラウザーで使えるシンプル
 - ノート、ベロシティ、チャンネル、コントローラー情報をリアルタイム表示。
 - C2〜C7の鍵盤で押下中の音を表示し、最新100件のログを確認。
 - 和音・ベロシティ・サステイン・ピッチベンド（±2半音）に対応したシンセ音を再生。音のオン・オフと音量を調整できます。
+- ソフトシンセ、ピアノ風、エレピ風、オルガン、ベル、ストリングス風、ベース、リード、8ビットの9種類の合成音色を選択でき、設定は保存されます。
 - ヘッダーのメニューで日本語・英語を切り替え。選択した言語はブラウザーに保存されます。
 
 ### 使い方
