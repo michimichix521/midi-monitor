@@ -2,6 +2,16 @@
 const $ = (id) => document.getElementById(id);
 const english = {
   "サウンド": "Sound",
+  "音色": "Tone",
+  "ソフトシンセ": "Soft synth",
+  "ピアノ風": "Piano-style",
+  "エレピ風": "Electric piano-style",
+  "オルガン": "Organ",
+  "ベル": "Bell",
+  "ストリングス風": "Strings-style",
+  "シンセベース": "Synth bass",
+  "シンセリード": "Synth lead",
+  "8ビット": "8-bit",
   "音を鳴らす": "Play sound",
   "音声を有効にする": "Enable audio",
   "音声の準備ができました": "Audio ready",
@@ -76,6 +86,22 @@ let access = null, input = null, total = 0, selectionVersion = 0, frame = 0, pul
 const held = new Map(), history = [], keys = new Map();
 let audioContext = null, masterGain = null, audioFailed = false;
 const voices = new Map(), sustain = new Set(), bends = new Map();
+// Layers: waveform, frequency ratio, mix weight, detune in cents.
+const tones = {
+  soft: {attack: .008, decay: .2, sustain: .85, release: .25, brightness: 10, layers: [['triangle', 1, 1, 0]]},
+  piano: {attack: .004, decay: .7, sustain: 0, release: .2, brightness: 7, layers: [['triangle', 1, .75, 0], ['sine', 2, .18, 0], ['sine', 3, .07, 0]]},
+  epiano: {attack: .006, decay: 1.1, sustain: 0, release: .4, brightness: 12, layers: [['sine', 1, .72, 0], ['sine', 2, .2, 0], ['sine', 4, .08, 3]]},
+  organ: {attack: .015, decay: .1, sustain: 1, release: .12, brightness: 16, layers: [['sine', 1, .5, 0], ['sine', 2, .3, 0], ['sine', 4, .2, 0]]},
+  bell: {attack: .002, decay: .9, sustain: 0, release: 1.3, brightness: 18, layers: [['sine', 1, .55, 0], ['sine', 2.76, .3, 0], ['sine', 5.4, .15, 0]]},
+  strings: {attack: .35, decay: .6, sustain: .7, release: .8, brightness: 4, layers: [['sawtooth', 1, .5, -7], ['sawtooth', 1, .5, 7]]},
+  bass: {attack: .008, decay: .15, sustain: .45, release: .13, brightness: 2, layers: [['sawtooth', 1, .65, 0], ['sine', .5, .35, 0]]},
+  lead: {attack: .012, decay: .15, sustain: .7, release: .2, brightness: 8, layers: [['sawtooth', 1, .6, -4], ['square', 1, .4, 4]]},
+  chip: {attack: .002, decay: .08, sustain: .65, release: .06, brightness: 20, layers: [['square', 1, 1, 0]]}
+};
+let tone = 'soft';
+try { const saved = localStorage.getItem('midi-monitor-tone'); if (Object.hasOwn(tones, saved)) tone = saved; } catch {}
+$('tone').value = tone;
+const soundingVoices = new Set();
 
 function renderAudioStatus() {
   const key = !$('sound-enabled').checked ? '音声はオフです' : audioFailed ? 'このブラウザーでは音声を開始できません' :
@@ -110,14 +136,26 @@ function releaseVoice(key, immediate = false) {
   const voice = voices.get(key);
   if (!voice) return;
   voices.delete(key);
+  fadeVoice(voice, immediate);
+}
+
+function fadeVoice(voice, immediate = false) {
   const now = audioContext.currentTime;
+  const elapsed = Math.max(0, now - voice.started);
+  const level = voice.releaseAt !== null ? voice.releaseLevel * Math.exp(-(now - voice.releaseAt) / voice.releaseTime) :
+    elapsed < voice.tone.attack ? voice.peak * elapsed / voice.tone.attack :
+    voice.peak * (voice.tone.sustain + (1 - voice.tone.sustain) * Math.exp(-(elapsed - voice.tone.attack) / voice.tone.decay));
   voice.gain.gain.cancelScheduledValues(now);
-  voice.gain.gain.setTargetAtTime(0, now, immediate ? 0.004 : 0.04);
-  voice.oscillator.stop(now + (immediate ? 0.025 : 0.25));
+  voice.gain.gain.setValueAtTime(level, now);
+  voice.releaseAt = now; voice.releaseLevel = level;
+  voice.releaseTime = immediate ? .004 : voice.tone.release / 6;
+  voice.gain.gain.setTargetAtTime(0, now, voice.releaseTime);
+  voice.layers.forEach(layer => layer.oscillator.stop(now + voice.releaseTime * 6));
 }
 
 function stopSound(channel = null) {
-  for (const [key, voice] of voices) if (channel === null || voice.channel === channel) releaseVoice(key, true);
+  for (const voice of soundingVoices) if (channel === null || voice.channel === channel) fadeVoice(voice, true);
+  for (const [key, voice] of voices) if (channel === null || voice.channel === channel) voices.delete(key);
   if (channel === null) { sustain.clear(); bends.clear(); }
   else { sustain.delete(channel); bends.delete(channel); }
 }
@@ -128,16 +166,43 @@ function playNote(channel, note, velocity) {
   releaseVoice(key, true);
   // Bound resource use even if a controller fails to send Note Off.
   if (voices.size >= 64) releaseVoice(voices.keys().next().value, true);
-  const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
-  oscillator.type = 'triangle';
-  oscillator.frequency.value = 440 * 2 ** ((note - 69) / 12);
-  oscillator.detune.value = bends.get(channel) || 0;
-  gain.gain.setValueAtTime(0, audioContext.currentTime);
-  gain.gain.linearRampToValueAtTime(0.14 * velocity / 127, audioContext.currentTime + 0.008);
-  oscillator.connect(gain); gain.connect(masterGain);
-  oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-  voices.set(key, {oscillator, gain, channel, released: false});
-  oscillator.start();
+  const preset = tones[tone], now = audioContext.currentTime;
+  const frequency = 440 * 2 ** ((note - 69) / 12), peak = .14 * velocity / 127;
+  const gain = audioContext.createGain(), filter = audioContext.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = Math.min(audioContext.sampleRate * .45, Math.max(180, frequency * preset.brightness));
+  filter.Q.value = .5;
+  filter.connect(gain); gain.connect(masterGain);
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + preset.attack);
+  gain.gain.setTargetAtTime(peak * preset.sustain, now + preset.attack, preset.decay);
+  const layers = preset.layers.map(([type, ratio, weight, detune]) => {
+    const oscillator = audioContext.createOscillator(), mix = audioContext.createGain();
+    oscillator.type = type;
+    oscillator.frequency.value = Math.min(audioContext.sampleRate * .45, frequency * ratio);
+    oscillator.detune.value = detune + (bends.get(channel) || 0);
+    mix.gain.value = weight;
+    oscillator.connect(mix); mix.connect(filter);
+    return {oscillator, mix, detune};
+  });
+  const voice = {layers, gain, channel, released: false, tone: preset, peak, started: now, releaseAt: null};
+  voices.set(key, voice); soundingVoices.add(voice);
+  let remaining = layers.length;
+  layers.forEach(({oscillator, mix}) => {
+    oscillator.onended = () => {
+      oscillator.disconnect(); mix.disconnect();
+      if (--remaining === 0) {
+        filter.disconnect(); gain.disconnect(); soundingVoices.delete(voice);
+        if (voices.get(key) === voice) voices.delete(key);
+      }
+    };
+    oscillator.start(now);
+    if (preset.sustain === 0) oscillator.stop(now + preset.attack + preset.decay * 12);
+  });
+}
+
+function bendVoice(voice, cents) {
+  voice.layers.forEach(layer => layer.oscillator.detune.setTargetAtTime(layer.detune + cents, audioContext.currentTime, .01));
 }
 
 function receiveSound(data) {
@@ -153,7 +218,7 @@ function receiveSound(data) {
     // Fixed pitch-bend range: two semitones in either direction.
     const cents = (((b << 7) | a) - 8192) / 8192 * 200;
     bends.set(channel, cents);
-    for (const voice of voices.values()) if (voice.channel === channel) voice.oscillator.detune.setTargetAtTime(cents, audioContext.currentTime, 0.01);
+    for (const voice of soundingVoices) if (voice.channel === channel) bendVoice(voice, cents);
   }
   if (type === 0xb0) {
     if (a === 64) {
@@ -168,13 +233,18 @@ function receiveSound(data) {
       sustain.delete(channel); bends.delete(channel);
       for (const [key, voice] of voices) if (voice.channel === channel) {
         if (voice.released) releaseVoice(key);
-        else voice.oscillator.detune.setTargetAtTime(0, audioContext.currentTime, 0.01);
+        else bendVoice(voice, 0);
       }
     }
   }
 }
 
 $('enable-audio').addEventListener('click', () => { $('sound-enabled').checked = true; void enableAudio(); });
+$('tone').addEventListener('change', () => {
+  tone = Object.hasOwn(tones, $('tone').value) ? $('tone').value : 'soft';
+  try { localStorage.setItem('midi-monitor-tone', tone); } catch {}
+  void enableAudio();
+});
 $('sound-enabled').addEventListener('change', () => {
   if ($('sound-enabled').checked) void enableAudio();
   else { stopSound(); renderAudioStatus(); }
