@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>楽譜PDF解析 — MIDI Monitor</title>
+  <meta name="description" content="ブラウザー内で楽譜PDFの五線と音符頭候補を確認する実験的な解析ページ。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c7f36b'/%3E%3Cpath d='M8 8v16m8-16v16m8-16v16' stroke='%23191d17' stroke-width='4'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="score.css">
+  <script type="module" src="js/score/app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html"><span aria-hidden="true">▥</span> MIDI MONITOR</a>
+    <div class="header-actions"><a href="index.html" data-i18n="MIDIモニターに戻る">MIDIモニターに戻る</a>
+      <select id="language" aria-label="Language / 言語"><option value="ja" lang="ja">日本語</option><option value="en" lang="en">English</option></select>
+    </div>
+  </header>
+  <main>
+    <div class="intro"><p class="eyebrow">SCORE LAB / MILESTONE 01</p><h1 data-i18n="楽譜PDFを見える形で解析">楽譜PDFを見える形で解析</h1>
+      <p data-i18n="PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。">PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。</p>
+      <p class="scope-note" data-i18n="現在は画像解析の試作段階です。音高・音価の確定、音符の編集、演奏採点はまだ行いません。">現在は画像解析の試作段階です。音高・音価の確定、音符の編集、演奏採点はまだ行いません。</p>
+    </div>
+    <section class="panel" aria-labelledby="upload-title">
+      <h2 id="upload-title" data-i18n="① PDFを選択 → ② 解析 → ③ 結果を確認">① PDFを選択 → ② 解析 → ③ 結果を確認</h2>
+      <div class="actions">
+        <div class="file-field"><label for="pdf-file" data-i18n="楽譜PDF（40 MBまで）">楽譜PDF（40 MBまで）</label><input id="pdf-file" type="file" accept="application/pdf"></div>
+        <button id="sample" class="secondary" type="button" data-i18n="サンプル楽譜を開く">サンプル楽譜を開く</button>
+        <button id="analyze" class="primary" type="button" disabled data-i18n="このページを解析">このページを解析</button>
+        <button id="cancel" class="secondary" type="button" hidden data-i18n="解析を中止">解析を中止</button>
+      </div>
+      <p class="hint" data-i18n="PDFは外部へ送信しません。初回は表示用ライブラリの読み込みにインターネット接続が必要です。">PDFは外部へ送信しません。初回は表示用ライブラリの読み込みにインターネット接続が必要です。</p>
+      <p id="status" role="status" aria-live="polite"></p>
+      <details id="settings"><summary data-i18n="詳細設定">詳細設定</summary>
+        <fieldset id="analysis-settings"><legend data-i18n="画像の読み取り方">画像の読み取り方</legend>
+          <div class="settings-grid">
+            <label><span data-i18n="二値化方式">二値化方式</span><select id="threshold-mode"><option value="fixed" data-i18n="固定しきい値">固定しきい値</option><option value="adaptive" data-i18n="周囲の明るさに合わせる">周囲の明るさに合わせる</option></select></label>
+            <label><span><span data-i18n="黒とみなす明るさ">黒とみなす明るさ</span> <output id="threshold-value" for="threshold">180</output></span><input id="threshold" type="range" min="40" max="245" value="180" step="1"></label>
+            <label><span data-i18n="周囲を見る半径（px）">周囲を見る半径（px）</span><input id="radius" type="number" min="5" max="80" value="18" step="1"></label>
+            <label><span data-i18n="周囲との明るさの差">周囲との明るさの差</span><input id="offset" type="number" min="1" max="60" value="12" step="1"></label>
+            <label><span data-i18n="五線候補の横幅（ページ幅比）">五線候補の横幅（ページ幅比）</span><input id="line-ratio" type="number" min="0.1" max="0.8" step="0.05" value="0.3"></label>
+            <label><span data-i18n="線間隔の許容誤差">線間隔の許容誤差</span><input id="spacing-tolerance" type="number" min="0.05" max="0.35" step="0.05" value="0.2"></label>
+            <label><span data-i18n="塊の最小面積（px）">塊の最小面積（px）</span><input id="min-area" type="number" min="2" max="100" value="5" step="1"></label>
+            <label><span data-i18n="有力候補の信頼度下限">有力候補の信頼度下限</span><input id="min-confidence" type="number" min="0.2" max="0.85" step="0.05" value="0.5"></label>
+          </div>
+          <label class="check"><input id="denoise" type="checkbox" checked><span data-i18n="孤立した小さなノイズを除去">孤立した小さなノイズを除去</span></label>
+        </fieldset>
+        <p class="hint" data-i18n="設定を変えたら再解析してください。薄い線にはしきい値を上げ、短い五線には横幅比を下げます。傾きの自動補正は未対応です。">設定を変えたら再解析してください。薄い線にはしきい値を上げ、短い五線には横幅比を下げます。傾きの自動補正は未対応です。</p>
+        <fieldset><legend data-i18n="表示する解析結果">表示する解析結果</legend>
+          <label class="check"><input id="debug" type="checkbox" checked><span data-i18n="デバッグ表示">デバッグ表示</span></label>
+          <div class="overlay-options" id="overlay-options">
+            <label class="check"><input id="show-staves" type="checkbox" checked><span data-i18n="五線と枠">五線と枠</span></label>
+            <label class="check"><input id="show-lines" type="checkbox"><span data-i18n="五線候補の横線">五線候補の横線</span></label>
+            <label class="check"><input id="show-components" type="checkbox"><span data-i18n="黒画素の塊">黒画素の塊</span></label>
+            <label class="check"><input id="show-projection" type="checkbox"><span data-i18n="横方向の黒画素数">横方向の黒画素数</span></label>
+            <label class="check"><input id="show-heads" type="checkbox" checked><span data-i18n="音符頭候補と番号">音符頭候補と番号</span></label>
+          </div>
+        </fieldset>
+      </details>
+    </section>
+    <div class="workspace">
+      <section class="panel viewer" aria-labelledby="viewer-title">
+        <div class="viewer-heading"><h2 id="viewer-title" data-i18n="楽譜と検出結果">楽譜と検出結果</h2><span id="filename" class="filename"></span></div>
+        <div class="viewer-toolbar">
+          <div class="pagination"><button id="previous" type="button" disabled data-i18n="前へ">前へ</button><label for="page-number" data-i18n="ページ">ページ</label><input id="page-number" type="number" min="1" max="1" value="1" disabled><span id="page-count">/ 0</span><button id="next" type="button" disabled data-i18n="次へ">次へ</button></div>
+          <label class="view-label"><span data-i18n="画像">画像</span><select id="view" disabled><option value="original" data-i18n="原画像">原画像</option><option value="gray" data-i18n="グレースケール">グレースケール</option><option value="binary" data-i18n="二値化">二値化</option><option value="cleaned" data-i18n="五線除去後">五線除去後</option></select></label>
+          <label class="check"><input id="actual-size" type="checkbox"><span data-i18n="等倍で表示">等倍で表示</span></label>
+        </div>
+        <div class="canvas-scroll" id="canvas-scroll"><div id="placeholder" data-i18n="楽譜PDFを選択してください。サンプルでも試せます。">楽譜PDFを選択してください。サンプルでも試せます。</div><div class="canvas-stack" id="canvas-stack" hidden><canvas id="page-canvas" aria-label="楽譜画像"></canvas><canvas id="overlay-canvas" tabindex="0" aria-label="解析結果。候補一覧からも選択できます。"></canvas></div></div>
+        <p class="legend"><span class="legend-staff" data-i18n="赤：検出五線">赤：検出五線</span><span class="legend-head" data-i18n="青緑：有力候補">青緑：有力候補</span><span class="legend-low" data-i18n="黄：低信頼度候補">黄：低信頼度候補</span></p>
+        <p class="hint" data-i18n="ページごとに解析します。別のページへ移動すると、このページの解析表示はリセットされます。">ページごとに解析します。別のページへ移動すると、このページの解析表示はリセットされます。</p>
+      </section>
+      <aside class="panel inspector" aria-labelledby="inspector-title">
+        <h2 id="inspector-title" data-i18n="③ 認識候補を確認">③ 認識候補を確認</h2>
+        <dl class="stats"><div><dt data-i18n="五線グループ">五線グループ</dt><dd id="staff-count">—</dd></div><div><dt data-i18n="黒画素の塊">黒画素の塊</dt><dd id="component-count">—</dd></div><div><dt data-i18n="音符頭候補">音符頭候補</dt><dd id="head-count">—</dd></div><div><dt data-i18n="有力候補">有力候補</dt><dd id="accepted-count">—</dd></div></dl>
+        <div id="warnings" role="status"></div>
+        <h3 data-i18n="五線間隔">五線間隔</h3><ul id="staff-list" class="staff-list"></ul>
+        <label for="candidate" data-i18n="音符頭候補を選択">音符頭候補を選択</label><select id="candidate" disabled></select>
+        <div id="candidate-detail" class="candidate-detail"></div>
+        <p class="hint" data-i18n="楽譜上の枠をクリックしても選択できます。信頼度は形状による目安で、正解率ではありません。">楽譜上の枠をクリックしても選択できます。信頼度は形状による目安で、正解率ではありません。</p>
+        <button id="export" class="secondary" type="button" disabled data-i18n="解析情報を保存（JSON）">解析情報を保存（JSON）</button>
+        <p class="hint" data-i18n="保存内容は位置と信頼度などの解析情報です。採点用JSONではありません。">保存内容は位置と信頼度などの解析情報です。採点用JSONではありません。</p>
+      </aside>
+    </div>
+    <section class="panel limitations"><h2 data-i18n="この段階で分かること・分からないこと">この段階で分かること・分からないこと</h2>
+      <p data-i18n="水平で鮮明な五線と、比較的独立した音符頭を対象にしています。音部記号・文字・臨時記号を音符と取り違えたり、和音・連桁・加線に触れた音符を見落とすことがあります。">水平で鮮明な五線と、比較的独立した音符頭を対象にしています。音部記号・文字・臨時記号を音符と取り違えたり、和音・連桁・加線に触れた音符を見落とすことがあります。</p>
+      <p data-i18n="次の段階で、音高とMIDI番号への変換、手動修正、beat単位の採点データ、MIDI演奏との比較を追加します。">次の段階で、音高とMIDI番号への変換、手動修正、beat単位の採点データ、MIDI演奏との比較を追加します。</p>
+    </section>
+    <footer><span data-i18n="ブラウザー内で解析・ファイルの外部送信なし">ブラウザー内で解析・ファイルの外部送信なし</span><a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener noreferrer">PDF.js · Apache-2.0</a></footer>
+  </main>
+  <noscript>JavaScriptを有効にしてください。 / Please enable JavaScript.</noscript>
+</body>
+</html>

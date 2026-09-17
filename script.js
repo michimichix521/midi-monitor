@@ -1,6 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const english = {
+  "楽譜PDF解析（試作）": "Score PDF analysis (prototype)",
   "サウンド": "Sound",
   "音色": "Tone",
   "ソフトシンセ": "Soft synth",

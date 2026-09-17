@@ -1,0 +1,162 @@
+import {ScorePDF} from './pdf.js';
+import {ScoreView, renderInspector} from './ui.js';
+import {initLanguage, t} from './i18n.js';
+import {samplePDF} from './sample.js';
+
+// Turn off to start with an unobstructed score; the UI can override this setting.
+const DEBUG = true;
+const $ = id => document.getElementById(id);
+const pdf = new ScorePDF(), view = new ScoreView($('page-canvas'), $('overlay-canvas'));
+let source = null, result = null, selected = null, worker = null, busy = false;
+let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
+let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
+
+function status(key, values = {}, error = false) {
+  statusKey = key; statusValues = values; statusError = error;
+  $('status').textContent = t(key, values); $('status').classList.toggle('error', error);
+}
+function controls() {
+  $('pdf-file').disabled = busy; $('sample').disabled = busy;
+  $('analyze').disabled = busy || !source;
+  $('previous').disabled = busy || currentPage <= 1 || !pageCount;
+  $('next').disabled = busy || currentPage >= pageCount;
+  $('page-number').disabled = busy || !pageCount;
+  $('page-number').value = currentPage; $('page-number').max = Math.max(1, pageCount);
+  $('page-count').textContent = `/ ${pageCount}`;
+  $('view').disabled = !result;
+  $('export').disabled = busy || !result;
+  $('analysis-settings').disabled = busy;
+  $('cancel').hidden = !worker;
+  $('canvas-scroll').setAttribute('aria-busy', String(busy));
+  const adaptive = $('threshold-mode').value === 'adaptive';
+  $('radius').disabled = !adaptive; $('offset').disabled = !adaptive;
+}
+function draw() {
+  view.draw(source, result, {mode: $('view').value, debug: $('debug').checked,
+    staves: $('show-staves').checked, lines: $('show-lines').checked, components: $('show-components').checked,
+    projection: $('show-projection').checked, heads: $('show-heads').checked}, selected);
+}
+function choose(id) { selected = id; renderInspector(result, selected, choose); draw(); }
+function refreshText() {
+  status(statusKey, statusValues, statusError);
+  $('filename').textContent = isSample ? t('サンプル楽譜（2ページ）') : fileName;
+  renderInspector(result, selected, choose); draw();
+}
+function resetPage() {
+  source = null; result = null; selected = null;
+  view.lastSource = null; view.lastResult = null;
+  $('canvas-stack').hidden = true; $('placeholder').hidden = false;
+  $('page-canvas').width = 0; $('page-canvas').height = 0;
+  $('overlay-canvas').width = 0; $('overlay-canvas').height = 0;
+  $('view').value = 'original';
+  renderInspector(null, null, choose);
+}
+function pdfError(error) {
+  status(error.name === 'PasswordException' ? 'パスワード付きPDFには未対応です。パスワードのないPDFを選択してください。' :
+    'PDFを表示できませんでした。ファイル形式とネット接続を確認してください。', {}, true);
+}
+async function renderPage(pageNumber) {
+  resetPage();
+  status('{page}ページ目を表示しています…', {page: pageNumber});
+  source = await pdf.render(pageNumber);
+  currentPage = pageNumber;
+  $('placeholder').hidden = true; $('canvas-stack').hidden = false;
+  $('canvas-scroll').scrollTop = 0; $('canvas-scroll').scrollLeft = 0;
+  draw();
+  status('{page} / {count}ページを表示しました。「このページを解析」を押してください。', {page: currentPage, count: pageCount});
+}
+async function loadPDF(bytes, name, sample = false) {
+  busy = true; pageCount = 0; currentPage = 1; fileName = name; isSample = sample;
+  resetPage(); controls(); refreshText(); status('PDFを読み込んでいます…');
+  try {
+    pageCount = await pdf.open(bytes);
+    await renderPage(1);
+  } catch (error) { pdfError(error); }
+  finally { busy = false; controls(); }
+}
+$('pdf-file').addEventListener('change', async () => {
+  const file = $('pdf-file').files[0];
+  if (!file || busy) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { status('PDFファイルを選択してください。', {}, true); return; }
+  if (file.size > 40 * 1024 * 1024) { status('PDFは40 MB以下にしてください。', {}, true); return; }
+  busy = true; controls(); status('PDFを読み込んでいます…');
+  try { await loadPDF(new Uint8Array(await file.arrayBuffer()), file.name); }
+  catch (error) { busy = false; controls(); pdfError(error); }
+  finally { $('pdf-file').value = ''; }
+});
+$('sample').addEventListener('click', () => { if (!busy) void loadPDF(samplePDF(), 'sample-score.pdf', true); });
+async function goToPage(number) {
+  if (busy || !pageCount) return;
+  if (!Number.isInteger(number) || number < 1 || number > pageCount || number === currentPage) { $('page-number').value = currentPage; return; }
+  busy = true; controls();
+  try { await renderPage(number); }
+  catch (error) { pdfError(error); }
+  finally { busy = false; controls(); }
+}
+$('previous').addEventListener('click', () => void goToPage(currentPage - 1));
+$('next').addEventListener('click', () => void goToPage(currentPage + 1));
+$('page-number').addEventListener('change', () => void goToPage(Number($('page-number').value)));
+
+function settings() {
+  const number = id => Number($(id).value);
+  return {threshold: number('threshold'), adaptive: $('threshold-mode').value === 'adaptive', radius: number('radius'),
+    offset: number('offset'), denoise: $('denoise').checked, lineRatio: number('line-ratio'),
+    spacingTolerance: number('spacing-tolerance'), minArea: number('min-area'), minConfidence: number('min-confidence')};
+}
+function finishWorker() { worker?.terminate(); worker = null; busy = false; controls(); }
+$('analyze').addEventListener('click', () => {
+  if (!source || busy) return;
+  for (const input of $('analysis-settings').querySelectorAll('input')) {
+    if (!input.disabled && (!input.checkValidity() || (input.type === 'number' && input.value === ''))) {
+      $('settings').open = true; input.focus(); input.reportValidity(); status('詳細設定の数値を範囲内で入力してください。', {}, true); return;
+    }
+  }
+  try {
+    worker = new Worker(new URL('./analysis-worker.js', import.meta.url), {type: 'module'});
+    busy = true; result = null; selected = null; controls(); choose(null);
+    const stages = {preprocess: 'グレースケール化・二値化を行っています…', staves: '五線を検出しています…',
+      components: '黒画素の塊を検出しています…', heads: '音符頭の候補を探しています…'};
+    worker.onmessage = ({data}) => {
+      if (data.type === 'progress') status(stages[data.stage]);
+      if (data.type === 'result') {
+        result = data.result; finishWorker(); choose(null);
+        status('解析完了：五線 {staves}組、音符頭候補 {heads}個。元の楽譜と見比べてください。', {staves: result.staves.length, heads: result.heads.length});
+      }
+      if (data.type === 'error') { finishWorker(); status('解析に失敗しました。設定を調整して再試行してください。', {}, true); }
+    };
+    worker.onerror = event => { event.preventDefault(); finishWorker(); status('解析に失敗しました。設定を調整して再試行してください。', {}, true); };
+    const image = source.getContext('2d').getImageData(0, 0, source.width, source.height);
+    worker.postMessage({rgba: image.data.buffer, width: image.width, height: image.height, settings: settings()}, [image.data.buffer]);
+    status(stages.preprocess);
+  } catch {
+    finishWorker(); status('解析を開始できませんでした。このブラウザーでWeb Workerが利用できるか確認してください。', {}, true);
+  }
+});
+$('cancel').addEventListener('click', () => { finishWorker(); status('解析を中止しました。'); });
+$('analysis-settings').addEventListener('input', () => {
+  $('threshold-value').value = $('threshold').value; controls();
+  if (result) status('設定が変わりました。「このページを解析」を押して更新してください。');
+});
+for (const id of ['view', 'debug', 'show-staves', 'show-lines', 'show-components', 'show-projection', 'show-heads']) $(id).addEventListener('change', draw);
+$('actual-size').addEventListener('change', () => $('canvas-stack').classList.toggle('actual', $('actual-size').checked));
+$('overlay-canvas').addEventListener('click', event => {
+  if (!result || !$('debug').checked || !$('show-heads').checked) return;
+  const rect = $('overlay-canvas').getBoundingClientRect();
+  const x = (event.clientX - rect.left) * result.width / rect.width, y = (event.clientY - rect.top) * result.height / rect.height;
+  const padding = Math.max(4, result.width / rect.width * 4);
+  const nearby = result.heads.filter(head => x >= head.x - padding && x <= head.x + head.width + padding && y >= head.y - padding && y <= head.y + head.height + padding);
+  nearby.sort((a, b) => Math.hypot(a.centerX - x, a.centerY - y) - Math.hypot(b.centerX - x, b.centerY - y));
+  choose(nearby[0]?.id || null);
+});
+$('export').addEventListener('click', () => {
+  if (!result) return;
+  const {width, height, settings, lines, staves, components, truncated, heads, projection} = result;
+  const data = {schema: 'midi-monitor.omr-analysis.v1', milestone: 1, fileName, page: currentPage, pageCount,
+    width, height, settings, lines, staves, components, truncated, heads, projection: Array.from(projection)};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
+  const link = document.createElement('a'); link.href = url; link.download = `score-analysis-page-${currentPage}.json`;
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+window.addEventListener('pagehide', () => { worker?.terminate(); });
+$('debug').checked = DEBUG;
+initLanguage(refreshText); controls();
