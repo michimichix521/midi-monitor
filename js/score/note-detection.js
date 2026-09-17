@@ -11,7 +11,12 @@ function headMask(binary, width, height, spacing) {
     if (y - top < minStem) continue;
     for (let row = top; row < y; row++) {
       const i = row * width + x;
-      const broad = (x >= side && binary[i - side]) || (x + side < width && binary[i + side]);
+      let broad = false;
+      // A hollow head's opposite edge may lie across a white interior.
+      // Preserve it instead of treating the attached outer edge as a bare stem.
+      for (let offset = side; offset <= Math.ceil(spacing * 1.5) && !broad; offset++) {
+        broad = (x >= offset && binary[i - offset]) || (x + offset < width && binary[i + offset]);
+      }
       if (!broad) mask[i] = 0;
     }
   }
@@ -72,5 +77,5 @@ export function detectNoteHeads(binary, width, height, staves, minConfidence = .
         kind: hollow ? 'hollow' : 'filled', confidence, accepted: confidence >= minConfidence});
     }
   }
-  return candidates.sort((a, b) => a.staff - b.staff || a.centerX - b.centerX);
+  return candidates.sort((a, b) => a.staff - b.staff || a.centerX - b.centerX).map((head, index) => ({...head, id: index + 1}));
 }
