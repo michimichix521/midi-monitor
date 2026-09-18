@@ -1,8 +1,8 @@
 import {grayscale, binarize, reduceNoise, removeStaffLines} from './image-processing.js';
 import {detectStaves} from './staff-detection.js';
 import {connectedComponents} from './components.js';
-import {detectNoteHeads} from './note-detection.js';
-import {enrichNoteRhythm} from './rhythm-detection.js';
+import {detectNoteHeads} from './note-detection.js?v=2';
+import {enrichNoteRhythm} from './rhythm-detection.js?v=2';
 
 self.onmessage = ({data: {rgba, width, height, settings}}) => {
   try {

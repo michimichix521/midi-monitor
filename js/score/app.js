@@ -150,7 +150,7 @@ $('analyze').addEventListener('click', () => {
     }
   }
   try {
-    worker = new Worker(new URL('./analysis-worker.js', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./analysis-worker.js?v=2', import.meta.url), {type: 'module'});
     busy = true; result = null; selected = null; controls(); choose(null);
     const stages = {preprocess: 'グレースケール化・二値化を行っています…', staves: '五線を検出しています…',
       components: '黒画素の塊を検出しています…', heads: '音符頭の候補を探しています…'};
