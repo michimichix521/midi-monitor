@@ -2,7 +2,7 @@ import {ScorePDF} from './pdf.js';
 import {ScoreView, renderInspector} from './ui.js?v=5';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
-import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=3';
+import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=4';
 import {ScorePlayer} from './playback.js';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.

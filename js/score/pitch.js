@@ -41,9 +41,10 @@ export function prepareScore(result, clefs = {}) {
 
 export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
   const staffSpacing = staves.length ? staves.reduce((sum, staff) => sum + staff.spacing, 0) / staves.length : 0;
-  // The upper and lower staves in piano notation can be rasterized a little apart.
-  // Keep notes in the same vertical time column together for simultaneous playback.
-  const chordTolerance = Math.max(xTolerance, staffSpacing * 1.1);
+  const sameStaffTolerance = Math.max(xTolerance, staffSpacing * .55);
+  // Rendering can shift the upper and lower staves independently. Use a wider
+  // tolerance only when pairing their already-ordered onset columns.
+  const handPairTolerance = Math.max(xTolerance, staffSpacing * 1.6);
   // Staff gaps larger than fourteen line spaces are treated as a new system.
   const orderedStaves = [...staves].sort((a, b) => a.top - b.top);
   let system = 0, previous = null;
@@ -61,10 +62,32 @@ export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
   const events = [], sortedSystems = [...rows.keys()].sort((a, b) => a - b);
   let beat = 0;
   for (const id of sortedSystems) {
-    const row = rows.get(id).sort((a, b) => a.centerX - b.centerX || a.centerY - b.centerY);
-    for (let index = 0; index < row.length;) {
-      const anchor = row[index].centerX, chord = [];
-      while (index < row.length && Math.abs(row[index].centerX - anchor) <= chordTolerance) chord.push(row[index++]);
+    const columns = [];
+    const byStaff = new Map();
+    for (const note of rows.get(id)) {
+      if (!byStaff.has(note.staff)) byStaff.set(note.staff, []);
+      byStaff.get(note.staff).push(note);
+    }
+    for (const [staff, staffNotes] of byStaff) {
+      staffNotes.sort((a, b) => a.centerX - b.centerX || a.centerY - b.centerY);
+      for (let index = 0; index < staffNotes.length;) {
+        const anchor = staffNotes[index].centerX, notesAtOnset = [];
+        while (index < staffNotes.length && Math.abs(staffNotes[index].centerX - anchor) <= sameStaffTolerance) notesAtOnset.push(staffNotes[index++]);
+        columns.push({staff, hand: notesAtOnset[0].hand, x: anchor, notes: notesAtOnset});
+      }
+    }
+    columns.sort((a, b) => a.x - b.x);
+    while (columns.length) {
+      const base = columns.shift(), paired = [base];
+      // Pair at most one onset column from each other staff. This preserves an
+      // eighth-note right hand against a quarter-note left hand.
+      for (let index = 0; index < columns.length;) {
+        const candidate = columns[index];
+        if (candidate.staff !== base.staff && Math.abs(candidate.x - base.x) <= handPairTolerance && !paired.some(column => column.staff === candidate.staff)) {
+          paired.push(candidate); columns.splice(index, 1);
+        } else index++;
+      }
+      const chord = paired.flatMap(column => column.notes);
       const durationBeat = Math.max(...chord.map(note => note.durationBeat));
       const manuallyPlaced = chord.map(note => note.startBeat).filter(Number.isFinite);
       const startBeat = manuallyPlaced.length ? Math.min(...manuallyPlaced) : beat;
