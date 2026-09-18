@@ -3,7 +3,7 @@ const english = {
   'MIDIモニターに戻る': 'Back to MIDI Monitor',
   '楽譜PDFを見える形で解析': 'See how your score is recognized',
   'PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。': 'Find staves and possible note heads in your PDF. These are estimates: compare them with the original score.',
-  '推定した音高を合成音で再生できます。音価は黒い音符頭を四分音符、白い音符頭を二分音符として仮定します。演奏採点はまだ行いません。': 'You can play the estimated pitches with a synth. Filled heads are treated as quarter notes and hollow heads as half notes. Performance grading is not implemented yet.',
+  '推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに全音符・二分音符・四分音符・八分音符を推定します。必要なら候補ごとに開始拍と長さを修正してください。': 'Play estimated pitches with a synth. Stem, flag, and beam hints estimate whole, half, quarter, and eighth notes. Correct each candidate’s start beat and duration when needed.',
   '① PDFを選択 → ② 解析 → ③ 結果を確認': '1. Choose a PDF → 2. Analyze → 3. Review',
   '楽譜PDF（40 MBまで）': 'Score PDF (up to 40 MB)',
   'サンプル楽譜を開く': 'Open sample score',
@@ -46,7 +46,7 @@ const english = {
   '保存内容は位置と信頼度などの解析情報です。採点用JSONではありません。': 'Exports positions, confidence, and analysis metadata. This is not a performance-grading score file.',
   'この段階で分かること・分からないこと': 'What this prototype can and cannot recognize',
   '水平で鮮明な五線と、比較的独立した音符頭を対象にしています。音部記号・文字・臨時記号を音符と取り違えたり、和音・連桁・加線に触れた音符を見落とすことがあります。': 'Designed for clear, horizontal staves and relatively isolated note heads. Clefs, text, or accidentals may be mistaken for notes; chords and heads touching beams or ledger lines may be missed.',
-  '音高は五線位置から推定し、個別に修正できます。旗・連桁・付点・休符・臨時記号・調号は未認識のため、現在の音価と半音は推定に含まれません。次の段階で、MIDI演奏との比較を追加します。': 'Pitch is estimated from staff position and can be corrected per note. Flags, beams, dots, rests, accidentals, and key signatures are not recognized, so rhythm and semitones are approximate. MIDI performance comparison is the next milestone.',
+  '符幹の有無と旗・連桁らしい形から音価を推定しますが、付点・休符・タイ・小節線・拍子は未認識です。複雑なリズムは候補の開始拍と長さを修正してください。次の段階で、MIDI演奏との比較を追加します。': 'Stem presence plus flag/beam-like shapes estimate duration, but dots, rests, ties, barlines, and meter are not recognized. Correct start beats and durations for complex rhythms. MIDI performance comparison is the next milestone.',
   'ブラウザー内で解析・ファイルの外部送信なし': 'Analyzed in your browser · No PDF uploads',
   'PDFを選択するか、サンプルを開いてください。': 'Choose a PDF or open the sample.',
   'PDFを読み込んでいます…': 'Loading PDF…',
@@ -84,6 +84,8 @@ const english = {
   'ト音記号': 'Treble', 'ヘ音記号': 'Bass', '推定音高は要確認': 'Estimated pitches need review', '再生中': 'Playing',
   '音声を開始できませんでした': 'Could not start audio', '停止しました': 'Stopped',
   '推定MIDI番号': 'Estimated MIDI number', '推定音名': 'Estimated note name', '長さ（拍）': 'Duration (beats)',
+  '開始拍（空欄で自動）': 'Start beat (blank = automatic)', '音価の推定': 'Rhythm estimate', '拍': 'beats', '自動': 'automatic',
+  '旗・連桁あり': 'flag or beam detected', '旗・連桁なし': 'no flag or beam detected',
   '再生に含める': 'Include in playback', '推定値に戻す': 'Restore estimate'
 };
 let language = 'ja';

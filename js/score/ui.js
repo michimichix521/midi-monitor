@@ -53,6 +53,7 @@ export class ScoreView {
       for (const box of result.components.slice(0, 5000)) ctx.strokeRect(box.x, box.y, box.width, box.height);
       ctx.globalAlpha = 1;
     }
+    const notesById = new Map((options.notes || []).map(note => [note.id, note]));
     if (options.heads) for (const head of result.heads) {
       ctx.strokeStyle = head.id === selected ? '#165aca' : color(head.accepted ? '--head' : '--low');
       ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = head.id === selected ? 4 : 2;
@@ -93,21 +94,23 @@ export function renderInspector(result, selected, choose, updateHead = () => {})
   const rows = [['五線番号', head.staff], ['信頼度', head.confidence.toFixed(2)],
     ['形状', t(head.kind === 'hollow' ? '白い音符頭候補' : '黒い音符頭候補')],
     ['位置', `${head.centerX.toFixed(1)}, ${head.centerY.toFixed(1)}`], ['幅 × 高さ', `${head.width} × ${head.height} px`],
-    ['黒画素密度', head.density.toFixed(2)], ['幅 / 五線間隔', head.relativeWidth.toFixed(2)], ['高さ / 五線間隔', head.relativeHeight.toFixed(2)]];
+    ['黒画素密度', head.density.toFixed(2)], ['幅 / 五線間隔', head.relativeWidth.toFixed(2)], ['高さ / 五線間隔', head.relativeHeight.toFixed(2)],
+    ['音価の推定', `${note?.rhythm?.durationBeat ?? '—'} ${t('拍')} · ${t(note?.rhythm?.flagged ? '旗・連桁あり' : '旗・連桁なし')}`];
   const list = document.createElement('dl');
   for (const [key, value] of rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = t(key); dd.textContent = value; list.append(dt, dd); }
   $('candidate-detail').append(list);
   if (!note) return;
   const editor = document.createElement('div'); editor.className = 'candidate-editor';
   const midi = document.createElement('input'); midi.type = 'number'; midi.min = '0'; midi.max = '127'; midi.value = String(note.midi);
+  const start = document.createElement('input'); start.type = 'number'; start.min = '0'; start.max = '999'; start.step = '.125'; start.placeholder = t('自動'); start.value = note.startBeat ?? '';
   const duration = document.createElement('input'); duration.type = 'number'; duration.min = '.125'; duration.max = '16'; duration.step = '.125'; duration.value = String(note.durationBeat);
   const included = document.createElement('input'); included.type = 'checkbox'; included.checked = note.included;
   const field = (label, input) => { const row = document.createElement('label'), text = document.createElement('span'); text.textContent = t(label); row.append(text, input); return row; };
-  editor.append(field('推定MIDI番号', midi), field('推定音名', Object.assign(document.createElement('output'), {textContent: `${note.step}${note.octave}`})), field('長さ（拍）', duration));
+  editor.append(field('推定MIDI番号', midi), field('推定音名', Object.assign(document.createElement('output'), {textContent: `${note.step}${note.octave}`})), field('開始拍（空欄で自動）', start), field('長さ（拍）', duration));
   const toggle = document.createElement('label'); toggle.className = 'check'; const text = document.createElement('span'); text.textContent = t('再生に含める'); toggle.append(included, text); editor.append(toggle);
   const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'secondary'; reset.textContent = t('推定値に戻す'); editor.append(reset);
-  const save = () => updateHead(head.id, {midi: Number(midi.value), durationBeat: Number(duration.value), included: included.checked});
-  midi.addEventListener('change', save); duration.addEventListener('change', save); included.addEventListener('change', save);
-  reset.addEventListener('click', () => updateHead(head.id, {midi: null, durationBeat: null, included: true}));
+  const save = () => updateHead(head.id, {midi: Number(midi.value), startBeat: start.value === '' ? null : Number(start.value), durationBeat: Number(duration.value), included: included.checked});
+  midi.addEventListener('change', save); start.addEventListener('change', save); duration.addEventListener('change', save); included.addEventListener('change', save);
+  reset.addEventListener('click', () => updateHead(head.id, {midi: null, startBeat: null, durationBeat: null, included: true}));
   $('candidate-detail').append(editor);
 }

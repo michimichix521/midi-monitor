@@ -24,9 +24,7 @@ export function inferPitch(head, staff, clef = 'treble') {
 }
 
 export function inferDuration(head) {
-  // This first version distinguishes open from filled heads only.
-  // Flags, beams, dots, ties, and rests require a later rhythm-recognition pass.
-  return head.kind === 'hollow' ? 2 : 1;
+  return head.rhythm?.durationBeat ?? (head.kind === 'hollow' ? 2 : 1);
 }
 
 export function prepareScore(result, clefs = {}) {
@@ -36,7 +34,7 @@ export function prepareScore(result, clefs = {}) {
     const staff = staves.get(head.staff), clef = clefs[head.staff] || (head.staff % 2 ? 'treble' : 'bass');
     const inferred = inferPitch(head, staff, clef);
     const midi = Number.isInteger(head.midi) ? head.midi : inferred.midi;
-    return {...head, clef, ...inferred, midi, durationBeat: Number.isFinite(head.durationBeat) ? head.durationBeat : inferDuration(head), included: head.included === undefined ? head.accepted : head.included};
+    return {...head, clef, ...inferred, midi, startBeat: Number.isFinite(head.startBeat) ? head.startBeat : null, durationBeat: Number.isFinite(head.durationBeat) ? head.durationBeat : inferDuration(head), included: head.included === undefined ? head.accepted : head.included};
   });
 }
 
@@ -63,13 +61,14 @@ export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
       const anchor = row[index].centerX, chord = [];
       while (index < row.length && Math.abs(row[index].centerX - anchor) <= xTolerance) chord.push(row[index++]);
       const durationBeat = Math.max(...chord.map(note => note.durationBeat));
-      events.push({startBeat: beat, durationBeat, notes: chord});
-      beat += durationBeat;
+      const manuallyPlaced = chord.map(note => note.startBeat).filter(Number.isFinite);
+      const startBeat = manuallyPlaced.length ? Math.min(...manuallyPlaced) : beat;
+      events.push({startBeat, durationBeat, notes: chord});
+      beat = Math.max(beat, startBeat + durationBeat);
     }
   }
-  return events;
+  return events.sort((a, b) => a.startBeat - b.startBeat);
 }
-
 export function scoreDataFromNotes(notes, tempo, staves = [], xTolerance = 10) {
   const events = buildPlaybackEvents(notes, staves, xTolerance);
   return {tempo, timeSignature: {numerator: 4, denominator: 4}, notes: events.flatMap(event => event.notes.map(note => ({

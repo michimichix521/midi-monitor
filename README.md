@@ -16,7 +16,7 @@ Open [Score Lab](https://michimichix521.github.io/midi-monitor/score.html), sele
 
 The prototype detects staff groups and note-head candidates, estimates pitch from the selected clef, and plays the estimated result with a browser synth. You can correct each candidate's MIDI number, duration, and inclusion before playback, then save score JSON.
 
-Recognition remains approximate. It does not reliably recognize clefs, accidentals, key signatures, rests, beams, flags, dots, or complex chords. Filled heads are assumed to be quarter notes and hollow heads half notes. MIDI performance grading is not implemented yet.
+Recognition remains approximate. Stem, flag, and beam hints estimate whole, half, quarter, and eighth notes; you can correct each note's start beat and duration. Dots, rests, ties, barlines, meter, accidentals, key signatures, and complex chords are not reliable. MIDI performance grading is not implemented yet.
 
 ---
 
@@ -38,4 +38,4 @@ Web MIDI対応ブラウザーでHTTPSのサイトを開き、MIDIデバイスを
 
 試作版では五線と音符頭候補を検出し、選択した音部記号から音高を推定してブラウザーのシンセで再生します。候補ごとにMIDI番号、音価、再生に含めるかを修正でき、採点用JSONとして保存できます。
 
-認識精度はまだ限定的です。音部記号、臨時記号、調号、休符、連桁、旗、付点、複雑な和音は正確に認識できません。黒い音符頭は四分音符、白い音符頭は二分音符として仮定します。MIDI演奏の採点は未実装です。
+認識精度はまだ限定的です。符幹・旗・連桁らしい形から全音符・二分音符・四分音符・八分音符を推定し、候補ごとに開始拍と長さを修正できます。付点、休符、タイ、小節線、拍子、臨時記号、調号、複雑な和音は正確に認識できません。MIDI演奏の採点は未実装です。
