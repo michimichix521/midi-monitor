@@ -95,7 +95,7 @@ export function renderInspector(result, selected, choose, updateHead = () => {})
     ['形状', t(head.kind === 'hollow' ? '白い音符頭候補' : '黒い音符頭候補')],
     ['位置', `${head.centerX.toFixed(1)}, ${head.centerY.toFixed(1)}`], ['幅 × 高さ', `${head.width} × ${head.height} px`],
     ['黒画素密度', head.density.toFixed(2)], ['幅 / 五線間隔', head.relativeWidth.toFixed(2)], ['高さ / 五線間隔', head.relativeHeight.toFixed(2)],
-    ['音価の推定', `${note?.rhythm?.durationBeat ?? '—'} ${t('拍')} · ${t(note?.rhythm?.flagged ? '旗・連桁あり' : '旗・連桁なし')}`];
+    ['音価の推定', `${note?.rhythm?.durationBeat ?? '—'} ${t('拍')} · ${t(note?.rhythm?.flagged ? '旗・連桁あり' : '旗・連桁なし')}`]];
   const list = document.createElement('dl');
   for (const [key, value] of rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = t(key); dd.textContent = value; list.append(dt, dd); }
   $('candidate-detail').append(list);

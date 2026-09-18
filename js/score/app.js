@@ -1,5 +1,5 @@
 import {ScorePDF} from './pdf.js';
-import {ScoreView, renderInspector} from './ui.js';
+import {ScoreView, renderInspector} from './ui.js?v=4';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
 import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js';
