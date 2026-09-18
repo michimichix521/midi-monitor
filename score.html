@@ -7,7 +7,7 @@
   <meta name="description" content="ブラウザー内で楽譜PDFの五線と音符頭候補を確認する実験的な解析ページ。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c7f36b'/%3E%3Cpath d='M8 8v16m8-16v16m8-16v16' stroke='%23191d17' stroke-width='4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="score.css">
-  <script type="module" src="js/score/app.js?v=5"></script>
+  <script type="module" src="js/score/app.js?v=6"></script>
 </head>
 <body>
   <header class="site-header">
@@ -19,7 +19,7 @@
   <main>
     <div class="intro"><p class="eyebrow">SCORE LAB / MILESTONE 01</p><h1 data-i18n="楽譜PDFを見える形で解析">楽譜PDFを見える形で解析</h1>
       <p data-i18n="PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。">PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。</p>
-      <p class="scope-note" data-i18n="推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに全音符・二分音符・四分音符・八分音符を推定します。必要なら候補ごとに開始拍と長さを修正してください。">推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに全音符・二分音符・四分音符・八分音符を推定します。必要なら候補ごとに開始拍と長さを修正してください。</p>
+      <p class="scope-note" data-i18n="推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに二分音符・四分音符・八分音符を推定します。全音符や複雑なリズムは候補ごとに開始拍と長さを修正してください。">推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに二分音符・四分音符・八分音符を推定します。全音符や複雑なリズムは候補ごとに開始拍と長さを修正してください。</p>
     </div>
     <section class="panel" aria-labelledby="upload-title">
       <h2 id="upload-title" data-i18n="① PDFを選択 → ② 解析 → ③ 結果を確認">① PDFを選択 → ② 解析 → ③ 結果を確認</h2>

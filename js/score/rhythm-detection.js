@@ -48,7 +48,10 @@ export function enrichNoteRhythm(binary, width, height, heads, staves) {
   return heads.map(head => {
     const staff = staffMap.get(head.staff), stem = findStem(binary, width, height, head, staff.spacing);
     const flagged = head.kind === 'filled' && hasFlagOrBeam(binary, width, height, stem, staff.spacing);
-    const durationBeat = head.kind === 'hollow' ? (stem ? 2 : 4) : (flagged ? .5 : 1);
+    // A stem can disappear during staff-line removal. Treat a hollow head as a
+    // half note unless the user explicitly changes it, rather than overextending
+    // playback by guessing a whole note.
+    const durationBeat = head.kind === 'hollow' ? 2 : (flagged ? .5 : 1);
     const rhythmConfidence = head.kind === 'hollow'
       ? (stem ? .76 : .66)
       : (stem ? (flagged ? .63 : .78) : .42);

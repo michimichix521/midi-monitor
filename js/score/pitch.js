@@ -39,6 +39,8 @@ export function prepareScore(result, clefs = {}) {
 }
 
 export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
+  const staffSpacing = staves.length ? staves.reduce((sum, staff) => sum + staff.spacing, 0) / staves.length : 0;
+  const chordTolerance = Math.max(xTolerance, staffSpacing * .6);
   // Staff gaps larger than fourteen line spaces are treated as a new system.
   const orderedStaves = [...staves].sort((a, b) => a.top - b.top);
   let system = 0, previous = null;
@@ -59,7 +61,7 @@ export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
     const row = rows.get(id).sort((a, b) => a.centerX - b.centerX || a.centerY - b.centerY);
     for (let index = 0; index < row.length;) {
       const anchor = row[index].centerX, chord = [];
-      while (index < row.length && Math.abs(row[index].centerX - anchor) <= xTolerance) chord.push(row[index++]);
+      while (index < row.length && Math.abs(row[index].centerX - anchor) <= chordTolerance) chord.push(row[index++]);
       const durationBeat = Math.max(...chord.map(note => note.durationBeat));
       const manuallyPlaced = chord.map(note => note.startBeat).filter(Number.isFinite);
       const startBeat = manuallyPlaced.length ? Math.min(...manuallyPlaced) : beat;

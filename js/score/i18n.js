@@ -3,7 +3,7 @@ const english = {
   'MIDIモニターに戻る': 'Back to MIDI Monitor',
   '楽譜PDFを見える形で解析': 'See how your score is recognized',
   'PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。': 'Find staves and possible note heads in your PDF. These are estimates: compare them with the original score.',
-  '推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに全音符・二分音符・四分音符・八分音符を推定します。必要なら候補ごとに開始拍と長さを修正してください。': 'Play estimated pitches with a synth. Stem, flag, and beam hints estimate whole, half, quarter, and eighth notes. Correct each candidate’s start beat and duration when needed.',
+  '推定した音高を合成音で再生できます。符幹・旗・連桁を手掛かりに二分音符・四分音符・八分音符を推定します。全音符や複雑なリズムは候補ごとに開始拍と長さを修正してください。': 'Play estimated pitches with a synth. Stem, flag, and beam hints estimate half, quarter, and eighth notes. Correct whole notes and complex rhythms per candidate.',
   '① PDFを選択 → ② 解析 → ③ 結果を確認': '1. Choose a PDF → 2. Analyze → 3. Review',
   '楽譜PDF（40 MBまで）': 'Score PDF (up to 40 MB)',
   'サンプル楽譜を開く': 'Open sample score',

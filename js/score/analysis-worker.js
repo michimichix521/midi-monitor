@@ -2,7 +2,7 @@ import {grayscale, binarize, reduceNoise, removeStaffLines} from './image-proces
 import {detectStaves} from './staff-detection.js';
 import {connectedComponents} from './components.js';
 import {detectNoteHeads} from './note-detection.js?v=2';
-import {enrichNoteRhythm} from './rhythm-detection.js?v=2';
+import {enrichNoteRhythm} from './rhythm-detection.js?v=3';
 
 self.onmessage = ({data: {rgba, width, height, settings}}) => {
   try {
