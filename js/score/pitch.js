@@ -34,13 +34,16 @@ export function prepareScore(result, clefs = {}) {
     const staff = staves.get(head.staff), clef = clefs[head.staff] || (head.staff % 2 ? 'treble' : 'bass');
     const inferred = inferPitch(head, staff, clef);
     const midi = Number.isInteger(head.midi) ? head.midi : inferred.midi;
-    return {...head, clef, ...inferred, midi, startBeat: Number.isFinite(head.startBeat) ? head.startBeat : null, durationBeat: Number.isFinite(head.durationBeat) ? head.durationBeat : inferDuration(head), included: head.included === undefined ? head.accepted : head.included};
+    const hand = clef === 'bass' ? 'left' : 'right';
+    return {...head, clef, hand, ...inferred, midi, startBeat: Number.isFinite(head.startBeat) ? head.startBeat : null, durationBeat: Number.isFinite(head.durationBeat) ? head.durationBeat : inferDuration(head), included: head.included === undefined ? head.accepted : head.included};
   });
 }
 
 export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
   const staffSpacing = staves.length ? staves.reduce((sum, staff) => sum + staff.spacing, 0) / staves.length : 0;
-  const chordTolerance = Math.max(xTolerance, staffSpacing * .6);
+  // The upper and lower staves in piano notation can be rasterized a little apart.
+  // Keep notes in the same vertical time column together for simultaneous playback.
+  const chordTolerance = Math.max(xTolerance, staffSpacing * 1.1);
   // Staff gaps larger than fourteen line spaces are treated as a new system.
   const orderedStaves = [...staves].sort((a, b) => a.top - b.top);
   let system = 0, previous = null;

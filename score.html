@@ -7,7 +7,7 @@
   <meta name="description" content="ブラウザー内で楽譜PDFの五線と音符頭候補を確認する実験的な解析ページ。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c7f36b'/%3E%3Cpath d='M8 8v16m8-16v16m8-16v16' stroke='%23191d17' stroke-width='4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="score.css">
-  <script type="module" src="js/score/app.js?v=6"></script>
+  <script type="module" src="js/score/app.js?v=7"></script>
 </head>
 <body>
   <header class="site-header">
@@ -78,6 +78,8 @@
         <label for="candidate" data-i18n="音符頭候補を選択">音符頭候補を選択</label><select id="candidate" disabled></select>
         <div id="candidate-detail" class="candidate-detail"></div>
         <p class="hint" data-i18n="楽譜上の枠をクリックしても選択できます。信頼度は形状による目安で、正解率ではありません。">楽譜上の枠をクリックしても選択できます。信頼度は形状による目安で、正解率ではありません。</p>
+        <button id="add-note" class="secondary" type="button" disabled data-i18n="音符を追加">音符を追加</button>
+        <p class="hint" data-i18n="追加を押してから、楽譜上の音符頭をクリックしてください。">追加を押してから、楽譜上の音符頭をクリックしてください。</p>
         <button id="export" class="secondary" type="button" disabled data-i18n="解析情報を保存（JSON）">解析情報を保存（JSON）</button>
         <p class="hint" data-i18n="保存内容は位置と信頼度などの解析情報です。採点用JSONではありません。">保存内容は位置と信頼度などの解析情報です。採点用JSONではありません。</p>
       </aside>

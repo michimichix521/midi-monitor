@@ -58,7 +58,7 @@ export function enrichNoteRhythm(binary, width, height, heads, staves) {
     // Notes sit on a staff line or space. A filled head without a stem is generally
     // punctuation or text after staff-line removal, so do not play it automatically.
     const gridAligned = head.alignmentError <= .32;
-    const structuralEvidence = head.kind === 'hollow' || Boolean(stem);
+    const structuralEvidence = Boolean(stem);
     const confidence = Math.min(head.confidence, rhythmConfidence) * (gridAligned ? 1 : .55);
     const accepted = head.accepted && gridAligned && structuralEvidence && confidence >= .5;
     return {...head, confidence, accepted, rhythm: {durationBeat, confidence: rhythmConfidence,

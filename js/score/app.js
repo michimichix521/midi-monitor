@@ -1,8 +1,8 @@
 import {ScorePDF} from './pdf.js';
-import {ScoreView, renderInspector} from './ui.js?v=4';
+import {ScoreView, renderInspector} from './ui.js?v=5';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
-import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=2';
+import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=3';
 import {ScorePlayer} from './playback.js';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
@@ -12,7 +12,7 @@ const pdf = new ScorePDF(), view = new ScoreView($('page-canvas'), $('overlay-ca
 let source = null, result = null, selected = null, worker = null, busy = false;
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
-let clefs = {}, events = [], isPlaying = false;
+let clefs = {}, events = [], isPlaying = false, addingNote = false;
 const player = new ScorePlayer(playing => { isPlaying = playing; controls(); });
 
 function status(key, values = {}, error = false) {
@@ -29,6 +29,7 @@ function controls() {
   $('page-count').textContent = `/ ${pageCount}`;
   $('view').disabled = !result;
   $('export').disabled = busy || !result;
+  $('add-note').disabled = busy || !result;
   $('play').disabled = busy || isPlaying || !events.length;
   $('stop').disabled = !isPlaying;
   $('export-score').disabled = busy || !events.length;
@@ -81,7 +82,7 @@ function refreshText() {
 }
 function resetPage() {
   source = null; result = null; selected = null;
-  events = []; clefs = {}; player.stop();
+  events = []; clefs = {}; addingNote = false; player.stop();
   view.lastSource = null; view.lastResult = null;
   $('canvas-stack').hidden = true; $('placeholder').hidden = false;
   $('page-canvas').width = 0; $('page-canvas').height = 0;
@@ -189,11 +190,29 @@ $('play').addEventListener('click', async () => {
   } catch { $('playback-status').textContent = t('音声を開始できませんでした'); }
 });
 $('stop').addEventListener('click', () => { player.stop(); $('playback-status').textContent = t('停止しました'); });
+$('add-note').addEventListener('click', () => {
+  if (!result) return;
+  addingNote = !addingNote;
+  $('add-note').classList.toggle('primary', addingNote);
+  status(addingNote ? '追加する音符頭を楽譜上でクリックしてください。' : '音符の追加を取り消しました。');
+});
 $('overlay-canvas').addEventListener('click', event => {
-  if (!result || !$('debug').checked || !$('show-heads').checked) return;
+  if (!result || (!addingNote && (!$('debug').checked || !$('show-heads').checked))) return;
   const rect = $('overlay-canvas').getBoundingClientRect();
   const x = (event.clientX - rect.left) * result.width / rect.width, y = (event.clientY - rect.top) * result.height / rect.height;
   const padding = Math.max(4, result.width / rect.width * 4);
+  if (addingNote) {
+    const staff = [...result.staves].sort((a, b) => Math.abs((a.top + a.bottom) / 2 - y) - Math.abs((b.top + b.bottom) / 2 - y))[0];
+    if (!staff) return;
+    const size = Math.max(5, Math.round(staff.spacing * .75));
+    const id = Math.max(0, ...result.heads.map(head => head.id)) + 1;
+    result.heads.push({id, staff: staff.id, x: x - size / 2, y: y - size / 3, width: size, height: Math.round(size * .7),
+      centerX: x, centerY: y, area: size * size * .55, density: .7, relativeWidth: size / staff.spacing,
+      relativeHeight: size * .7 / staff.spacing, alignmentError: 0, kind: 'filled', confidence: 1, accepted: true,
+      rhythm: {durationBeat: 1, confidence: 1, gridAligned: true, stem: null, flagged: false}, manual: true});
+    addingNote = false; $('add-note').classList.remove('primary'); selected = id; updateScore();
+    status('音符を追加しました。MIDI番号・開始拍・長さを確認してください。'); return;
+  }
   const nearby = result.heads.filter(head => x >= head.x - padding && x <= head.x + head.width + padding && y >= head.y - padding && y <= head.y + head.height + padding);
   nearby.sort((a, b) => Math.hypot(a.centerX - x, a.centerY - y) - Math.hypot(b.centerX - x, b.centerY - y));
   choose(nearby[0]?.id || null);
