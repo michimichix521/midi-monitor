@@ -2,6 +2,8 @@ import {ScorePDF} from './pdf.js';
 import {ScoreView, renderInspector} from './ui.js';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
+import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js';
+import {ScorePlayer} from './playback.js';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
 const DEBUG = true;
@@ -10,6 +12,8 @@ const pdf = new ScorePDF(), view = new ScoreView($('page-canvas'), $('overlay-ca
 let source = null, result = null, selected = null, worker = null, busy = false;
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
+let clefs = {}, events = [], isPlaying = false;
+const player = new ScorePlayer(playing => { isPlaying = playing; controls(); });
 
 function status(key, values = {}, error = false) {
   statusKey = key; statusValues = values; statusError = error;
@@ -25,6 +29,9 @@ function controls() {
   $('page-count').textContent = `/ ${pageCount}`;
   $('view').disabled = !result;
   $('export').disabled = busy || !result;
+  $('play').disabled = busy || isPlaying || !events.length;
+  $('stop').disabled = !isPlaying;
+  $('export-score').disabled = busy || !events.length;
   $('analysis-settings').disabled = busy;
   $('cancel').hidden = !worker;
   $('canvas-scroll').setAttribute('aria-busy', String(busy));
@@ -34,22 +41,53 @@ function controls() {
 function draw() {
   view.draw(source, result, {mode: $('view').value, debug: $('debug').checked,
     staves: $('show-staves').checked, lines: $('show-lines').checked, components: $('show-components').checked,
-    projection: $('show-projection').checked, heads: $('show-heads').checked}, selected);
+    projection: $('show-projection').checked, heads: $('show-heads').checked, notes: result?.playNotes || []}, selected);
 }
-function choose(id) { selected = id; renderInspector(result, selected, choose); draw(); }
+function updateScore() {
+  if (!result) { events = []; renderPlayback(); return; }
+  result.playNotes = prepareScore(result, clefs);
+  events = buildPlaybackEvents(result.playNotes, result.staves, Number($('chord-tolerance').value));
+  renderInspector(result, selected, choose, updateHead); renderPlayback(); draw(); controls();
+}
+function choose(id) { selected = id; renderInspector(result, selected, choose, updateHead); draw(); }
+function updateHead(id, changes) {
+  const head = result?.heads.find(item => item.id === id);
+  if (!head) return;
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null) delete head[key]; else head[key] = value;
+  }
+  updateScore();
+}
+function renderPlayback() {
+  const notes = result?.playNotes || [];
+  $('playable-count').textContent = notes.filter(note => note.included).length || '—';
+  $('event-count').textContent = events.length || '—';
+  $('estimated-beats').textContent = events.length ? Math.max(...events.map(event => event.startBeat + event.durationBeat)).toFixed(2) : '—';
+  $('clefs').replaceChildren();
+  for (const staff of result?.staves || []) {
+    const label = document.createElement('label'), text = document.createElement('span'), select = document.createElement('select');
+    text.textContent = `${t('五線')} ${staff.id} · ${t('音部記号')}`;
+    select.append(new Option(t('ト音記号'), 'treble'), new Option(t('ヘ音記号'), 'bass'));
+    select.value = clefs[staff.id] || (staff.id % 2 ? 'treble' : 'bass');
+    select.addEventListener('change', () => { clefs[staff.id] = select.value; updateScore(); });
+    label.append(text, select); $('clefs').append(label);
+  }
+  $('playback-status').textContent = result ? t('推定音高は要確認') : '';
+}
 function refreshText() {
   status(statusKey, statusValues, statusError);
   $('filename').textContent = isSample ? t('サンプル楽譜（2ページ）') : fileName;
-  renderInspector(result, selected, choose); draw();
+  renderInspector(result, selected, choose, updateHead); renderPlayback(); draw();
 }
 function resetPage() {
   source = null; result = null; selected = null;
+  events = []; clefs = {}; player.stop();
   view.lastSource = null; view.lastResult = null;
   $('canvas-stack').hidden = true; $('placeholder').hidden = false;
   $('page-canvas').width = 0; $('page-canvas').height = 0;
   $('overlay-canvas').width = 0; $('overlay-canvas').height = 0;
   $('view').value = 'original';
-  renderInspector(null, null, choose);
+  renderInspector(null, null, choose, updateHead); renderPlayback();
 }
 function pdfError(error) {
   status(error.name === 'PasswordException' ? 'パスワード付きPDFには未対応です。パスワードのないPDFを選択してください。' :
@@ -119,7 +157,7 @@ $('analyze').addEventListener('click', () => {
     worker.onmessage = ({data}) => {
       if (data.type === 'progress') status(stages[data.stage]);
       if (data.type === 'result') {
-        result = data.result; finishWorker(); choose(null);
+        result = data.result; finishWorker(); updateScore(); choose(null);
         status('解析完了：五線 {staves}組、音符頭候補 {heads}個。元の楽譜と見比べてください。', {staves: result.staves.length, heads: result.heads.length});
       }
       if (data.type === 'error') { finishWorker(); status('解析に失敗しました。設定を調整して再試行してください。', {}, true); }
@@ -139,6 +177,18 @@ $('analysis-settings').addEventListener('input', () => {
 });
 for (const id of ['view', 'debug', 'show-staves', 'show-lines', 'show-components', 'show-projection', 'show-heads']) $(id).addEventListener('change', draw);
 $('actual-size').addEventListener('change', () => $('canvas-stack').classList.toggle('actual', $('actual-size').checked));
+$('tempo').addEventListener('change', () => { if ($('tempo').checkValidity()) renderPlayback(); });
+$('chord-tolerance').addEventListener('change', () => { if ($('chord-tolerance').checkValidity()) updateScore(); });
+$('play').addEventListener('click', async () => {
+  if (!events.length || !$('tempo').checkValidity()) return;
+  try {
+    await player.play(events, Number($('tempo').value), event => {
+      const current = event.notes[0]; choose(current?.id || null);
+      $('playback-status').textContent = current ? `${t('再生中')} · ${current.step}${current.octave} · MIDI ${current.midi}` : t('再生中');
+    });
+  } catch { $('playback-status').textContent = t('音声を開始できませんでした'); }
+});
+$('stop').addEventListener('click', () => { player.stop(); $('playback-status').textContent = t('停止しました'); });
 $('overlay-canvas').addEventListener('click', event => {
   if (!result || !$('debug').checked || !$('show-heads').checked) return;
   const rect = $('overlay-canvas').getBoundingClientRect();
@@ -157,6 +207,13 @@ $('export').addEventListener('click', () => {
   const link = document.createElement('a'); link.href = url; link.download = `score-analysis-page-${currentPage}.json`;
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
-window.addEventListener('pagehide', () => { worker?.terminate(); });
+$('export-score').addEventListener('click', () => {
+  if (!result?.playNotes?.length) return;
+  const data = scoreDataFromNotes(result.playNotes, Number($('tempo').value), result.staves, Number($('chord-tolerance').value));
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
+  const link = document.createElement('a'); link.href = url; link.download = `score-playback-page-${currentPage}.json`;
+  document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+window.addEventListener('pagehide', () => { worker?.terminate(); player.stop(); });
 $('debug').checked = DEBUG;
 initLanguage(refreshText); controls();

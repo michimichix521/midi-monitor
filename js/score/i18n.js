@@ -3,7 +3,7 @@ const english = {
   'MIDIモニターに戻る': 'Back to MIDI Monitor',
   '楽譜PDFを見える形で解析': 'See how your score is recognized',
   'PDFから五線と音符頭の候補を探します。結果は推定です。まず元の楽譜と見比べてください。': 'Find staves and possible note heads in your PDF. These are estimates: compare them with the original score.',
-  '現在は画像解析の試作段階です。音高・音価の確定、音符の編集、演奏採点はまだ行いません。': 'This is an image-analysis prototype. Pitch, rhythm, note editing, and performance grading are not implemented yet.',
+  '推定した音高を合成音で再生できます。音価は黒い音符頭を四分音符、白い音符頭を二分音符として仮定します。演奏採点はまだ行いません。': 'You can play the estimated pitches with a synth. Filled heads are treated as quarter notes and hollow heads as half notes. Performance grading is not implemented yet.',
   '① PDFを選択 → ② 解析 → ③ 結果を確認': '1. Choose a PDF → 2. Analyze → 3. Review',
   '楽譜PDF（40 MBまで）': 'Score PDF (up to 40 MB)',
   'サンプル楽譜を開く': 'Open sample score',
@@ -46,7 +46,7 @@ const english = {
   '保存内容は位置と信頼度などの解析情報です。採点用JSONではありません。': 'Exports positions, confidence, and analysis metadata. This is not a performance-grading score file.',
   'この段階で分かること・分からないこと': 'What this prototype can and cannot recognize',
   '水平で鮮明な五線と、比較的独立した音符頭を対象にしています。音部記号・文字・臨時記号を音符と取り違えたり、和音・連桁・加線に触れた音符を見落とすことがあります。': 'Designed for clear, horizontal staves and relatively isolated note heads. Clefs, text, or accidentals may be mistaken for notes; chords and heads touching beams or ledger lines may be missed.',
-  '次の段階で、音高とMIDI番号への変換、手動修正、beat単位の採点データ、MIDI演奏との比較を追加します。': 'Next milestones: pitch and MIDI conversion, manual correction, beat-based score data, and comparison with a MIDI performance.',
+  '音高は五線位置から推定し、個別に修正できます。旗・連桁・付点・休符・臨時記号・調号は未認識のため、現在の音価と半音は推定に含まれません。次の段階で、MIDI演奏との比較を追加します。': 'Pitch is estimated from staff position and can be corrected per note. Flags, beams, dots, rests, accidentals, and key signatures are not recognized, so rhythm and semitones are approximate. MIDI performance comparison is the next milestone.',
   'ブラウザー内で解析・ファイルの外部送信なし': 'Analyzed in your browser · No PDF uploads',
   'PDFを選択するか、サンプルを開いてください。': 'Choose a PDF or open the sample.',
   'PDFを読み込んでいます…': 'Loading PDF…',
@@ -76,7 +76,15 @@ const english = {
   '五線番号': 'Staff', '信頼度': 'Confidence', '形状': 'Shape', '位置': 'Position', '幅 × 高さ': 'Width × height',
   '黒画素密度': 'Ink density', '幅 / 五線間隔': 'Width / staff spacing', '高さ / 五線間隔': 'Height / staff spacing',
   '楽譜画像': 'Score image', '解析結果。候補一覧からも選択できます。': 'Analysis overlay. Candidates can also be selected using the list.',
-  'サンプル楽譜（2ページ）': 'Sample score (2 pages)'
+  'サンプル楽譜（2ページ）': 'Sample score (2 pages)',
+  '④ 推定した音を確認する': '4. Review the estimated notes',
+  '有力候補を、各段の左から右へ再生します。同じ横位置の候補は和音として同時に鳴らします。再生前に音部記号と個別のMIDI番号・長さを確認してください。': 'Likely candidates play left to right within each system. Candidates at the same horizontal position play as a chord. Check clefs plus individual MIDI numbers and durations before playback.',
+  'テンポ（BPM）': 'Tempo (BPM)', '和音とみなす横位置（px）': 'Chord x tolerance (px)', '推定音を再生': 'Play estimated notes', '停止': 'Stop', '採点用JSONを保存': 'Save score JSON',
+  '再生対象の音符': 'playable notes', '再生イベント': 'playback events', '推定拍数': 'estimated beats', '五線': 'Staff', '音部記号': 'Clef',
+  'ト音記号': 'Treble', 'ヘ音記号': 'Bass', '推定音高は要確認': 'Estimated pitches need review', '再生中': 'Playing',
+  '音声を開始できませんでした': 'Could not start audio', '停止しました': 'Stopped',
+  '推定MIDI番号': 'Estimated MIDI number', '推定音名': 'Estimated note name', '長さ（拍）': 'Duration (beats)',
+  '再生に含める': 'Include in playback', '推定値に戻す': 'Restore estimate'
 };
 let language = 'ja';
 try { if (localStorage.getItem('midi-monitor-language') === 'en') language = 'en'; } catch {}

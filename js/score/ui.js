@@ -57,13 +57,14 @@ export class ScoreView {
       ctx.strokeStyle = head.id === selected ? '#165aca' : color(head.accepted ? '--head' : '--low');
       ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = head.id === selected ? 4 : 2;
       ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);
-      ctx.fillText(String(head.id), head.x, head.y - 7);
+      const note = notesById.get(head.id);
+      ctx.fillText(note ? `${head.id} · ${note.step}${note.octave}` : String(head.id), head.x, head.y - 7);
     }
     ctx.restore();
   }
 }
 
-export function renderInspector(result, selected, choose) {
+export function renderInspector(result, selected, choose, updateHead = () => {}) {
   const $ = id => document.getElementById(id);
   $('staff-count').textContent = result ? result.staves.length : '—';
   $('component-count').textContent = result ? result.components.length : '—';
@@ -87,6 +88,7 @@ export function renderInspector(result, selected, choose) {
   $('candidate').onchange = () => choose(Number($('candidate').value) || null);
   $('candidate-detail').replaceChildren();
   const head = result?.heads.find(item => item.id === selected);
+  const note = result?.playNotes?.find(item => item.id === selected);
   if (!head) return;
   const rows = [['五線番号', head.staff], ['信頼度', head.confidence.toFixed(2)],
     ['形状', t(head.kind === 'hollow' ? '白い音符頭候補' : '黒い音符頭候補')],
@@ -95,4 +97,17 @@ export function renderInspector(result, selected, choose) {
   const list = document.createElement('dl');
   for (const [key, value] of rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = t(key); dd.textContent = value; list.append(dt, dd); }
   $('candidate-detail').append(list);
+  if (!note) return;
+  const editor = document.createElement('div'); editor.className = 'candidate-editor';
+  const midi = document.createElement('input'); midi.type = 'number'; midi.min = '0'; midi.max = '127'; midi.value = String(note.midi);
+  const duration = document.createElement('input'); duration.type = 'number'; duration.min = '.125'; duration.max = '16'; duration.step = '.125'; duration.value = String(note.durationBeat);
+  const included = document.createElement('input'); included.type = 'checkbox'; included.checked = note.included;
+  const field = (label, input) => { const row = document.createElement('label'), text = document.createElement('span'); text.textContent = t(label); row.append(text, input); return row; };
+  editor.append(field('推定MIDI番号', midi), field('推定音名', Object.assign(document.createElement('output'), {textContent: `${note.step}${note.octave}`})), field('長さ（拍）', duration));
+  const toggle = document.createElement('label'); toggle.className = 'check'; const text = document.createElement('span'); text.textContent = t('再生に含める'); toggle.append(included, text); editor.append(toggle);
+  const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'secondary'; reset.textContent = t('推定値に戻す'); editor.append(reset);
+  const save = () => updateHead(head.id, {midi: Number(midi.value), durationBeat: Number(duration.value), included: included.checked});
+  midi.addEventListener('change', save); duration.addEventListener('change', save); included.addEventListener('change', save);
+  reset.addEventListener('click', () => updateHead(head.id, {midi: null, durationBeat: null, included: true}));
+  $('candidate-detail').append(editor);
 }
