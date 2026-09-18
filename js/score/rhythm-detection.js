@@ -49,9 +49,16 @@ export function enrichNoteRhythm(binary, width, height, heads, staves) {
     const staff = staffMap.get(head.staff), stem = findStem(binary, width, height, head, staff.spacing);
     const flagged = head.kind === 'filled' && hasFlagOrBeam(binary, width, height, stem, staff.spacing);
     const durationBeat = head.kind === 'hollow' ? (stem ? 2 : 4) : (flagged ? .5 : 1);
-    const confidence = head.kind === 'hollow'
+    const rhythmConfidence = head.kind === 'hollow'
       ? (stem ? .76 : .66)
       : (stem ? (flagged ? .63 : .78) : .42);
-    return {...head, rhythm: {durationBeat, confidence, stem: stem ? {side: stem.side, length: stem.length} : null, flagged}};
+    // Notes sit on a staff line or space. A filled head without a stem is generally
+    // punctuation or text after staff-line removal, so do not play it automatically.
+    const gridAligned = head.alignmentError <= .32;
+    const structuralEvidence = head.kind === 'hollow' || Boolean(stem);
+    const confidence = Math.min(head.confidence, rhythmConfidence) * (gridAligned ? 1 : .55);
+    const accepted = head.accepted && gridAligned && structuralEvidence && confidence >= .5;
+    return {...head, confidence, accepted, rhythm: {durationBeat, confidence: rhythmConfidence,
+      gridAligned, stem: stem ? {side: stem.side, length: stem.length} : null, flagged}};
   });
 }

@@ -70,11 +70,12 @@ export function detectNoteHeads(binary, width, height, staves, minConfidence = .
       const shape = Math.max(0, 1 - Math.abs(relativeWidth - 1.25) / 1.25) *
         Math.max(0, 1 - Math.abs(relativeHeight - .85) / .85);
       const steps = (staff.bottom - centerY) / (spacing / 2);
-      const alignment = 1 - Math.min(1, Math.abs(steps - Math.round(steps)) * 2);
+      const alignmentError = Math.abs(steps - Math.round(steps));
+      const alignment = 1 - Math.min(1, alignmentError * 2);
       const confidence = Math.min(.85, .28 + .34 * shape + .13 * alignment + .1 * staff.confidence);
       candidates.push({id: candidates.length + 1, staff: staff.id, x, y, width: box.width, height: box.height,
         centerX, centerY, area: box.area, density: box.density, relativeWidth, relativeHeight,
-        kind: hollow ? 'hollow' : 'filled', confidence, accepted: confidence >= minConfidence});
+        kind: hollow ? 'hollow' : 'filled', alignmentError, confidence, accepted: confidence >= minConfidence});
     }
   }
   return candidates.sort((a, b) => a.staff - b.staff || a.centerX - b.centerX).map((head, index) => ({...head, id: index + 1}));
