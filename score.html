@@ -7,7 +7,7 @@
   <meta name="description" content="ブラウザー内で楽譜PDFの五線と音符頭候補を確認する実験的な解析ページ。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c7f36b'/%3E%3Cpath d='M8 8v16m8-16v16m8-16v16' stroke='%23191d17' stroke-width='4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="score.css">
-  <script type="module" src="js/score/app.js?v=11"></script>
+  <script type="module" src="js/score/app.js?v=12"></script>
 </head>
 <body>
   <header class="site-header">
@@ -97,6 +97,26 @@
       </div>
       <div id="clefs" class="clefs"></div>
       <div class="event-summary"><span><strong id="playable-count">—</strong> <span data-i18n="再生対象の音符">再生対象の音符</span></span><span><strong id="event-count">—</strong> <span data-i18n="再生イベント">再生イベント</span></span><span><strong id="estimated-beats">—</strong> <span data-i18n="推定拍数">推定拍数</span></span></div>
+    </section>
+    <section class="panel grading" aria-labelledby="grading-title">
+      <div class="playback-heading"><div><p class="eyebrow">MILESTONE 03</p><h2 id="grading-title" data-i18n="⑤ MIDI演奏を採点する">⑤ MIDI演奏を採点する</h2></div><output id="judge-feedback" role="status"></output></div>
+      <p class="hint" data-i18n="楽譜を解析・修正してからMIDIキーボードを接続します。「演奏開始」を押した時点からテンポに合わせて判定します。">楽譜を解析・修正してからMIDIキーボードを接続します。「演奏開始」を押した時点からテンポに合わせて判定します。</p>
+      <div class="playback-controls">
+        <button id="midi-connect" class="secondary" type="button" data-i18n="MIDIキーボードを接続">MIDIキーボードを接続</button>
+        <button id="judge-start" class="primary" type="button" disabled data-i18n="演奏開始">演奏開始</button>
+        <button id="judge-finish" class="secondary" type="button" disabled data-i18n="採点を終了">採点を終了</button>
+      </div>
+      <p id="midi-status" class="hint" role="status"></p>
+      <details><summary data-i18n="採点の詳細設定">採点の詳細設定</summary><div class="settings-grid judge-settings">
+        <label><span>PERFECT (ms)</span><input id="perfect-ms" type="number" min="10" max="300" value="50"></label>
+        <label><span>GREAT (ms)</span><input id="great-ms" type="number" min="20" max="500" value="100"></label>
+        <label><span>GOOD (ms)</span><input id="good-ms" type="number" min="30" max="800" value="180"></label>
+      </div></details>
+      <div id="judge-results" class="judge-results" hidden>
+        <div class="score-total"><span data-i18n="総合スコア">総合スコア</span><strong id="score-total">0</strong></div>
+        <div class="result-grid"><span><b id="pitch-score">0%</b><small data-i18n="音程精度">音程精度</small></span><span><b id="timing-score">0%</b><small data-i18n="タイミング精度">タイミング精度</small></span><span><b id="duration-score">0%</b><small data-i18n="音価精度">音価精度</small></span><span><b id="extra-count">0</b><small data-i18n="余分な音">余分な音</small></span></div>
+        <p id="grade-counts"></p><p id="judge-stats" class="hint"></p>
+      </div>
     </section>
     <section class="panel limitations"><h2 data-i18n="この段階で分かること・分からないこと">この段階で分かること・分からないこと</h2>
       <p data-i18n="水平で鮮明な五線と、比較的独立した音符頭を対象にしています。音部記号・文字・臨時記号を音符と取り違えたり、和音・連桁・加線に触れた音符を見落とすことがあります。">水平で鮮明な五線と、比較的独立した音符頭を対象にしています。音部記号・文字・臨時記号を音符と取り違えたり、和音・連桁・加線に触れた音符を見落とすことがあります。</p>

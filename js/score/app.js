@@ -4,6 +4,8 @@ import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
 import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=7';
 import {ScorePlayer} from './playback.js';
+import {ScoreMidiInput} from './midi-input.js';
+import {PerformanceJudge} from './judge.js';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
 const DEBUG = true;
@@ -13,6 +15,12 @@ let source = null, result = null, selected = null, worker = null, busy = false;
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
 let clefs = {}, events = [], isPlaying = false, addingNote = false;
+let midiConnected = false, judge = null, judging = false;
+const midi = new ScoreMidiInput(handleMidi, names => {
+  midiConnected = names.length > 0;
+  $('midi-status').textContent = names.length ? `${t('MIDI接続済み')}：${names.join(', ')}` : t('MIDI入力が見つかりません');
+  controls();
+});
 const player = new ScorePlayer(playing => { isPlaying = playing; controls(); });
 
 function status(key, values = {}, error = false) {
@@ -33,11 +41,32 @@ function controls() {
   $('play').disabled = busy || isPlaying || !events.length;
   $('stop').disabled = !isPlaying;
   $('export-score').disabled = busy || !events.length;
+  $('midi-connect').disabled = busy;
+  $('judge-start').disabled = busy || judging || !midiConnected || !events.length;
+  $('judge-finish').disabled = !judging;
   $('analysis-settings').disabled = busy;
   $('cancel').hidden = !worker;
   $('canvas-scroll').setAttribute('aria-busy', String(busy));
   const adaptive = $('threshold-mode').value === 'adaptive';
   $('radius').disabled = !adaptive; $('offset').disabled = !adaptive;
+}
+function gradingThresholds() {
+  return {perfect: Number($('perfect-ms').value), great: Number($('great-ms').value), good: Number($('good-ms').value)};
+}
+function handleMidi(type, note) {
+  if (!judging || !judge) return;
+  const outcome = type === 'on' ? judge.on(note) : (judge.off(note), null);
+  if (outcome) $('judge-feedback').textContent = outcome.extra ? t('EXTRA NOTE') : outcome.grade;
+}
+function finishJudging() {
+  if (!judge) return;
+  const score = judge.finish(); judging = false;
+  $('score-total').textContent = String(score.total); $('pitch-score').textContent = `${Math.round(score.pitch)}%`;
+  $('timing-score').textContent = `${Math.round(score.timing)}%`; $('duration-score').textContent = `${Math.round(score.duration)}%`;
+  $('extra-count').textContent = String(score.extra);
+  $('grade-counts').textContent = `PERFECT ${score.counts.PERFECT} · GREAT ${score.counts.GREAT} · GOOD ${score.counts.GOOD} · MISS ${score.counts.MISS}`;
+  $('judge-stats').textContent = `${t('平均タイミング誤差')} ${Math.round(score.averageError)} ms · ${t('最大タイミング誤差')} ${Math.round(score.maximumError)} ms · ${t('演奏ノート数')} ${score.played} / ${t('正解ノート数')} ${score.expected}`;
+  $('judge-results').hidden = false; $('judge-feedback').textContent = t('採点結果'); controls();
 }
 function draw() {
   view.draw(source, result, {mode: $('view').value, debug: $('debug').checked,
@@ -191,6 +220,17 @@ $('play').addEventListener('click', async () => {
   } catch { $('playback-status').textContent = t('音声を開始できませんでした'); }
 });
 $('stop').addEventListener('click', () => { player.stop(); $('playback-status').textContent = t('停止しました'); });
+$('midi-connect').addEventListener('click', async () => {
+  try { await midi.connect(); }
+  catch { $('midi-status').textContent = t('MIDI接続に失敗しました。HTTPS対応ブラウザーで確認してください。'); }
+});
+$('judge-start').addEventListener('click', () => {
+  const thresholds = gradingThresholds();
+  if (!(thresholds.perfect <= thresholds.great && thresholds.great <= thresholds.good)) { $('judge-feedback').textContent = t('判定時間を小さい順に設定してください'); return; }
+  judge = new PerformanceJudge(events, Number($('tempo').value), thresholds); judge.start(); judging = true;
+  $('judge-results').hidden = true; $('judge-feedback').textContent = t('演奏中'); controls();
+});
+$('judge-finish').addEventListener('click', finishJudging);
 $('add-note').addEventListener('click', () => {
   if (!result) return;
   addingNote = !addingNote;

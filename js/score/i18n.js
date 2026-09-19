@@ -92,6 +92,12 @@ const english = {
   '開始拍（空欄で自動）': 'Start beat (blank = automatic)', '音価の推定': 'Rhythm estimate', '拍': 'beats', '自動': 'automatic',
   '旗・連桁あり': 'flag or beam detected', '旗・連桁なし': 'no flag or beam detected',
   '再生に含める': 'Include in playback', '推定値に戻す': 'Restore estimate'
+  ,'⑤ MIDI演奏を採点する': '5. Grade MIDI performance'
+  ,'楽譜を解析・修正してからMIDIキーボードを接続します。「演奏開始」を押した時点からテンポに合わせて判定します。': 'Analyze and correct the score, then connect a MIDI keyboard. Timing starts when you press Start performance.'
+  ,'MIDIキーボードを接続': 'Connect MIDI keyboard', '演奏開始': 'Start performance', '採点を終了': 'Finish grading', '採点の詳細設定': 'Grading settings'
+  ,'総合スコア': 'Total score', '音程精度': 'Pitch accuracy', 'タイミング精度': 'Timing accuracy', '音価精度': 'Duration accuracy', '余分な音': 'Extra notes'
+  ,'MIDI接続済み': 'MIDI connected', 'MIDI入力が見つかりません': 'No MIDI input found', 'MIDI接続に失敗しました。HTTPS対応ブラウザーで確認してください。': 'Could not connect MIDI. Use an HTTPS browser with Web MIDI support.'
+  ,'判定時間を小さい順に設定してください': 'Set timing limits in ascending order', '演奏中': 'Performing', '採点結果': 'Results', '平均タイミング誤差': 'Average timing error', '最大タイミング誤差': 'Maximum timing error', '演奏ノート数': 'Played notes', '正解ノート数': 'Expected notes'
 };
 let language = 'ja';
 try { if (localStorage.getItem('midi-monitor-language') === 'en') language = 'en'; } catch {}
