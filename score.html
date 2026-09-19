@@ -7,7 +7,7 @@
   <meta name="description" content="ブラウザー内で楽譜PDFの五線と音符頭候補を確認する実験的な解析ページ。">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c7f36b'/%3E%3Cpath d='M8 8v16m8-16v16m8-16v16' stroke='%23191d17' stroke-width='4'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="score.css">
-  <script type="module" src="js/score/app.js?v=13"></script>
+  <script type="module" src="js/score/app.js?v=14"></script>
 </head>
 <body>
   <header class="site-header">
@@ -68,7 +68,7 @@
           <label class="view-label"><span data-i18n="画像">画像</span><select id="view" disabled><option value="original" data-i18n="原画像">原画像</option><option value="gray" data-i18n="グレースケール">グレースケール</option><option value="binary" data-i18n="二値化">二値化</option><option value="cleaned" data-i18n="五線除去後">五線除去後</option></select></label>
           <label class="check"><input id="actual-size" type="checkbox"><span data-i18n="等倍で表示">等倍で表示</span></label>
         </div>
-        <div class="canvas-scroll" id="canvas-scroll"><div id="placeholder" data-i18n="楽譜PDFを選択してください。サンプルでも試せます。">楽譜PDFを選択してください。サンプルでも試せます。</div><div class="canvas-stack" id="canvas-stack" hidden><canvas id="page-canvas" aria-label="楽譜画像"></canvas><canvas id="overlay-canvas" tabindex="0" aria-label="解析結果。候補一覧からも選択できます。"></canvas></div></div>
+        <div class="canvas-scroll" id="canvas-scroll"><div id="placeholder" data-i18n="楽譜PDFを選択してください。サンプルでも試せます。">楽譜PDFを選択してください。サンプルでも試せます。</div><div id="all-pages" hidden><div class="canvas-stack" id="canvas-stack"><canvas id="page-canvas" aria-label="楽譜画像"></canvas><canvas id="overlay-canvas" tabindex="0" aria-label="解析結果。候補一覧からも選択できます。"></canvas></div><div id="additional-pages"></div></div></div>
         <p class="legend"><span class="legend-staff" data-i18n="赤：検出五線">赤：検出五線</span><span class="legend-head" data-i18n="青緑：有力候補">青緑：有力候補</span><span class="legend-low" data-i18n="黄：低信頼度候補">黄：低信頼度候補</span></p>
         <p class="hint" data-i18n="ページごとに解析します。別のページへ移動すると、このページの解析表示はリセットされます。">ページごとに解析します。別のページへ移動すると、このページの解析表示はリセットされます。</p>
       </section>

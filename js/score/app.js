@@ -12,6 +12,7 @@ const DEBUG = true;
 const $ = id => document.getElementById(id);
 const pdf = new ScorePDF(), view = new ScoreView($('page-canvas'), $('overlay-canvas'));
 let source = null, result = null, selected = null, worker = null, busy = false;
+const pageSources = new Map();
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
 let clefs = {}, events = [], isPlaying = false, addingNote = false;
@@ -123,7 +124,7 @@ function resetPage() {
   source = null; result = null; selected = null;
   addingNote = false; player.stop();
   view.lastSource = null; view.lastResult = null;
-  $('canvas-stack').hidden = true; $('placeholder').hidden = false;
+  $('all-pages').hidden = true; $('placeholder').hidden = false; $('additional-pages').replaceChildren();
   $('page-canvas').width = 0; $('page-canvas').height = 0;
   $('overlay-canvas').width = 0; $('overlay-canvas').height = 0;
   $('view').value = 'original';
@@ -136,13 +137,28 @@ function pdfError(error) {
 async function renderPage(pageNumber) {
   resetPage();
   status('{page}ページ目を表示しています…', {page: pageNumber});
-  source = await pdf.render(pageNumber);
+  source = pageSources.get(pageNumber) || await pdf.render(pageNumber);
   currentPage = pageNumber;
   result = pageAnalyses.get(pageNumber) || null;
-  $('placeholder').hidden = true; $('canvas-stack').hidden = false;
+  $('placeholder').hidden = true; $('all-pages').hidden = false;
   $('canvas-scroll').scrollTop = 0; $('canvas-scroll').scrollLeft = 0;
   draw(); if (result) updateScore();
   status('{page} / {count}ページを表示しました。「このページを解析」を押してください。', {page: currentPage, count: pageCount});
+}
+async function renderAllPages() {
+  pageSources.clear(); $('additional-pages').replaceChildren();
+  status('全{count}ページを表示しています…', {count: pageCount});
+  for (let page = 1; page <= pageCount; page++) {
+    const canvas = await pdf.render(page); pageSources.set(page, canvas);
+    if (page === 1) { source = canvas; continue; }
+    const preview = document.createElement('section'); preview.className = 'page-preview';
+    const label = document.createElement('p'); label.textContent = `${t('ページ')} ${page} / ${pageCount}`;
+    preview.append(label, canvas); $('additional-pages').append(preview);
+  }
+  currentPage = 1; result = pageAnalyses.get(1) || null; selected = null;
+  $('placeholder').hidden = true; $('all-pages').hidden = false; $('canvas-scroll').scrollTop = 0;
+  draw(); if (result) updateScore();
+  status('全{count}ページを縦に表示しました。先頭ページを解析するか、全ページ解析を選んでください。', {count: pageCount});
 }
 async function loadPDF(bytes, name, sample = false) {
   busy = true; pageCount = 0; currentPage = 1; fileName = name; isSample = sample;
@@ -150,7 +166,7 @@ async function loadPDF(bytes, name, sample = false) {
   resetPage(); controls(); refreshText(); status('PDFを読み込んでいます…');
   try {
     pageCount = await pdf.open(bytes);
-    await renderPage(1);
+    await renderAllPages();
   } catch (error) { pdfError(error); }
   finally { busy = false; controls(); }
 }
@@ -231,7 +247,7 @@ $('analyze-all').addEventListener('click', async () => {
   try {
     for (let page = 1; page <= pageCount; page++) {
       status('{page} / {count}ページを解析しています…', {page, count: pageCount});
-      const canvas = page === currentPage ? source : await pdf.render(page);
+      const canvas = pageSources.get(page) || await pdf.render(page);
       pageAnalyses.set(page, await analyzeCanvas(canvas, page));
     }
     result = pageAnalyses.get(currentPage) || null; selected = null; updateScore();
