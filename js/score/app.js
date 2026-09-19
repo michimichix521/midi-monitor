@@ -81,10 +81,10 @@ function draw() {
 function drawPreviewOverlay(page, analysis) {
   const preview = pagePreviews.get(page);
   if (!preview || !analysis) return;
-  preview.querySelector('.preview-overlay')?.remove();
-  const overlay = document.createElement('canvas'); overlay.className = 'preview-overlay';
-  overlay.width = analysis.width; overlay.height = analysis.height;
-  const ctx = overlay.getContext('2d'), notes = new Map((analysis.playNotes || []).map(note => [note.id, note]));
+  const composite = document.createElement('canvas'); composite.className = 'composite-page';
+  composite.width = analysis.width; composite.height = analysis.height;
+  const ctx = composite.getContext('2d'), notes = new Map((analysis.playNotes || []).map(note => [note.id, note]));
+  ctx.drawImage(pageSources.get(page), 0, 0);
   ctx.lineWidth = 2; ctx.font = '16px sans-serif';
   for (const staff of analysis.staves) {
     ctx.strokeStyle = '#e74654aa';
@@ -96,7 +96,7 @@ function drawPreviewOverlay(page, analysis) {
     ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);
     ctx.fillText(note ? `${head.id} · ${note.step}${note.octave}` : String(head.id), head.x, head.y - 7);
   }
-  preview.querySelector('.preview-canvas').append(overlay);
+  preview.querySelector('.preview-canvas').replaceChildren(composite);
 }
 function drawAllPreviewOverlays() {
   for (const [page, analysis] of pageAnalyses) if (page !== 1) drawPreviewOverlay(page, analysis);
