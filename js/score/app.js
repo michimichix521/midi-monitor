@@ -108,7 +108,8 @@ function updateScore() {
   let offset = 0; events = [];
   for (const [, page] of [...pageAnalyses].sort((a, b) => a[0] - b[0])) {
     page.playNotes = prepareScore(page, clefs);
-    const pageEvents = buildPlaybackEvents(page.playNotes, page.staves, page.measures, Number($('chord-tolerance').value));
+    const selectedHands = page.playNotes.filter(note => (note.hand === 'right' ? $('include-right').checked : $('include-left').checked));
+    const pageEvents = buildPlaybackEvents(selectedHands, page.staves, page.measures, Number($('chord-tolerance').value));
     events.push(...pageEvents.map(event => ({...event, startBeat: event.startBeat + offset})));
     offset += pageEvents.length ? Math.max(...pageEvents.map(event => event.startBeat + event.durationBeat)) : 0;
   }
@@ -124,7 +125,7 @@ function updateHead(id, changes) {
   updateScore();
 }
 function renderPlayback() {
-  const notes = pageAnalyses.size ? [...pageAnalyses.values()].flatMap(page => page.playNotes || []) : (result?.playNotes || []);
+  const notes = (pageAnalyses.size ? [...pageAnalyses.values()].flatMap(page => page.playNotes || []) : (result?.playNotes || [])).filter(note => note.hand === 'right' ? $('include-right').checked : $('include-left').checked);
   $('playable-count').textContent = notes.filter(note => note.included).length || '—';
   $('event-count').textContent = events.length || '—';
   $('estimated-beats').textContent = events.length ? Math.max(...events.map(event => event.startBeat + event.durationBeat)).toFixed(2) : '—';
@@ -290,6 +291,7 @@ for (const id of ['view', 'debug', 'show-staves', 'show-lines', 'show-components
 $('actual-size').addEventListener('change', () => $('canvas-stack').classList.toggle('actual', $('actual-size').checked));
 $('tempo').addEventListener('change', () => { if ($('tempo').checkValidity()) renderPlayback(); });
 $('chord-tolerance').addEventListener('change', () => { if ($('chord-tolerance').checkValidity()) updateScore(); });
+for (const id of ['include-right', 'include-left']) $(id).addEventListener('change', updateScore);
 $('play').addEventListener('click', async () => {
   if (!events.length || !$('tempo').checkValidity()) return;
   try {
