@@ -39,7 +39,7 @@ export function prepareScore(result, clefs = {}) {
   });
 }
 
-export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
+export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 10) {
   const staffSpacing = staves.length ? staves.reduce((sum, staff) => sum + staff.spacing, 0) / staves.length : 0;
   const sameStaffTolerance = Math.max(xTolerance, staffSpacing * .55);
   // Staff gaps larger than fourteen line spaces are treated as a new system.
@@ -64,22 +64,41 @@ export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
       if (!byStaff.has(note.staff)) byStaff.set(note.staff, []);
       byStaff.get(note.staff).push(note);
     }
+    const measureGroup = measures.find(group => group.system === id && group.boundaries.length >= 2);
     let systemEndBeat = systemStartBeat;
     for (const [staff, staffNotes] of byStaff) {
       staffNotes.sort((a, b) => a.centerX - b.centerX || a.centerY - b.centerY);
-      // Each staff advances independently. A four-beat bass note therefore
-      // sustains while the treble staff can play four quarter notes above it.
-      let staffBeat = systemStartBeat;
+      const columns = [];
       for (let index = 0; index < staffNotes.length;) {
         const anchor = staffNotes[index].centerX, notesAtOnset = [];
         while (index < staffNotes.length && Math.abs(staffNotes[index].centerX - anchor) <= sameStaffTolerance) notesAtOnset.push(staffNotes[index++]);
-        const durationBeat = Math.max(...notesAtOnset.map(note => note.durationBeat));
-        const manuallyPlaced = notesAtOnset.map(note => note.startBeat).filter(Number.isFinite);
-        const startBeat = manuallyPlaced.length ? Math.min(...manuallyPlaced) : staffBeat;
-        events.push({startBeat, durationBeat, notes: notesAtOnset});
-        staffBeat = Math.max(staffBeat, startBeat + durationBeat);
+        columns.push({x: anchor, notes: notesAtOnset});
       }
-      systemEndBeat = Math.max(systemEndBeat, staffBeat);
+      if (measureGroup) {
+        for (let measure = 0; measure + 1 < measureGroup.boundaries.length; measure++) {
+          const left = measureGroup.boundaries[measure], right = measureGroup.boundaries[measure + 1];
+          const measureStart = systemStartBeat + measure * 4;
+          let staffBeat = measureStart;
+          for (const column of columns.filter(column => column.x >= left && (measure + 2 === measureGroup.boundaries.length ? column.x <= right : column.x < right))) {
+            const durationBeat = Math.max(...column.notes.map(note => note.durationBeat));
+            const manual = column.notes.map(note => note.startBeat).filter(Number.isFinite);
+            const startBeat = manual.length ? Math.min(...manual) : staffBeat;
+            events.push({startBeat, durationBeat: Math.min(durationBeat, Math.max(.125, measureStart + 4 - startBeat)), notes: column.notes});
+            staffBeat = Math.max(staffBeat, startBeat + durationBeat);
+          }
+        }
+        systemEndBeat = Math.max(systemEndBeat, systemStartBeat + (measureGroup.boundaries.length - 1) * 4);
+      } else {
+        let staffBeat = systemStartBeat;
+        for (const column of columns) {
+          const durationBeat = Math.max(...column.notes.map(note => note.durationBeat));
+          const manual = column.notes.map(note => note.startBeat).filter(Number.isFinite);
+          const startBeat = manual.length ? Math.min(...manual) : staffBeat;
+          events.push({startBeat, durationBeat, notes: column.notes});
+          staffBeat = Math.max(staffBeat, startBeat + durationBeat);
+        }
+        systemEndBeat = Math.max(systemEndBeat, staffBeat);
+      }
     }
     systemStartBeat = systemEndBeat;
   }
@@ -95,8 +114,8 @@ export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
   }
   return merged;
 }
-export function scoreDataFromNotes(notes, tempo, staves = [], xTolerance = 10) {
-  const events = buildPlaybackEvents(notes, staves, xTolerance);
+export function scoreDataFromNotes(notes, tempo, staves = [], measures = [], xTolerance = 10) {
+  const events = buildPlaybackEvents(notes, staves, measures, xTolerance);
   return {tempo, timeSignature: {numerator: 4, denominator: 4}, notes: events.flatMap(event => event.notes.map(note => ({
     id: note.id, midi: note.midi, startBeat: event.startBeat, durationBeat: note.durationBeat,
     measure: Math.floor(event.startBeat / 4) + 1, staff: note.staff, hand: note.clef === 'bass' ? 'left' : 'right', confidence: note.confidence

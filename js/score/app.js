@@ -2,7 +2,7 @@ import {ScorePDF} from './pdf.js';
 import {ScoreView, renderInspector} from './ui.js?v=6';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
-import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=6';
+import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=7';
 import {ScorePlayer} from './playback.js';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
@@ -48,7 +48,7 @@ function draw() {
 function updateScore() {
   if (!result) { events = []; renderPlayback(); return; }
   result.playNotes = prepareScore(result, clefs);
-  events = buildPlaybackEvents(result.playNotes, result.staves, Number($('chord-tolerance').value));
+  events = buildPlaybackEvents(result.playNotes, result.staves, result.measures, Number($('chord-tolerance').value));
   renderInspector(result, selected, choose, updateHead); renderPlayback(); draw(); controls();
 }
 function choose(id) { selected = id; renderInspector(result, selected, choose, updateHead); draw(); }
@@ -220,16 +220,16 @@ $('overlay-canvas').addEventListener('click', event => {
 });
 $('export').addEventListener('click', () => {
   if (!result) return;
-  const {width, height, settings, lines, staves, components, truncated, heads, projection} = result;
+  const {width, height, settings, lines, staves, measures, components, truncated, heads, projection} = result;
   const data = {schema: 'midi-monitor.omr-analysis.v1', milestone: 1, fileName, page: currentPage, pageCount,
-    width, height, settings, lines, staves, components, truncated, heads, projection: Array.from(projection)};
+    width, height, settings, lines, staves, measures, components, truncated, heads, projection: Array.from(projection)};
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
   const link = document.createElement('a'); link.href = url; link.download = `score-analysis-page-${currentPage}.json`;
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 $('export-score').addEventListener('click', () => {
   if (!result?.playNotes?.length) return;
-  const data = scoreDataFromNotes(result.playNotes, Number($('tempo').value), result.staves, Number($('chord-tolerance').value));
+  const data = scoreDataFromNotes(result.playNotes, Number($('tempo').value), result.staves, result.measures, Number($('chord-tolerance').value));
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
   const link = document.createElement('a'); link.href = url; link.download = `score-playback-page-${currentPage}.json`;
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
