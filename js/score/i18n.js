@@ -100,6 +100,7 @@ const english = {
   ,'判定時間を小さい順に設定してください': 'Set timing limits in ascending order', '演奏中': 'Performing', '採点結果': 'Results', '平均タイミング誤差': 'Average timing error', '最大タイミング誤差': 'Maximum timing error', '演奏ノート数': 'Played notes', '正解ノート数': 'Expected notes'
   ,'全ページを解析して採点対象にする': 'Analyze all pages for grading', '解析中': 'Analyzing', '{page} / {count}ページを解析しています…': 'Analyzing page {page} of {count}…', '全{count}ページを解析し、連続した採点対象にしました。': 'Analyzed all {count} pages as one continuous performance.', '全ページの解析に失敗しました。設定を調整して再試行してください。': 'Could not analyze every page. Adjust settings and try again.'
   ,'全{count}ページを表示しています…': 'Rendering all {count} pages…', '全{count}ページを縦に表示しました。先頭ページを解析するか、全ページ解析を選んでください。': 'All {count} pages are shown vertically. Analyze the first page or choose Analyze all pages.'
+  ,'楽譜を解析': 'Analyze score', '全{count}ページを縦に表示しました。「楽譜を解析」を押してください。': 'All {count} pages are shown vertically. Click Analyze score.'
 };
 let language = 'ja';
 try { if (localStorage.getItem('midi-monitor-language') === 'en') language = 'en'; } catch {}

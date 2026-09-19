@@ -158,7 +158,7 @@ async function renderAllPages() {
   currentPage = 1; result = pageAnalyses.get(1) || null; selected = null;
   $('placeholder').hidden = true; $('all-pages').hidden = false; $('canvas-scroll').scrollTop = 0;
   draw(); if (result) updateScore();
-  status('全{count}ページを縦に表示しました。先頭ページを解析するか、全ページ解析を選んでください。', {count: pageCount});
+  status('全{count}ページを縦に表示しました。「楽譜を解析」を押してください。', {count: pageCount});
 }
 async function loadPDF(bytes, name, sample = false) {
   busy = true; pageCount = 0; currentPage = 1; fileName = name; isSample = sample;
