@@ -42,9 +42,6 @@ export function prepareScore(result, clefs = {}) {
 export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
   const staffSpacing = staves.length ? staves.reduce((sum, staff) => sum + staff.spacing, 0) / staves.length : 0;
   const sameStaffTolerance = Math.max(xTolerance, staffSpacing * .55);
-  // Rendering can shift the upper and lower staves independently. Use a wider
-  // tolerance only when pairing their already-ordered onset columns.
-  const handPairTolerance = Math.max(xTolerance, staffSpacing * 1.6);
   // Staff gaps larger than fourteen line spaces are treated as a new system.
   const orderedStaves = [...staves].sort((a, b) => a.top - b.top);
   let system = 0, previous = null;
@@ -60,42 +57,43 @@ export function buildPlaybackEvents(notes, staves, xTolerance = 10) {
     rows.get(id).push(note);
   }
   const events = [], sortedSystems = [...rows.keys()].sort((a, b) => a - b);
-  let beat = 0;
+  let systemStartBeat = 0;
   for (const id of sortedSystems) {
-    const columns = [];
     const byStaff = new Map();
     for (const note of rows.get(id)) {
       if (!byStaff.has(note.staff)) byStaff.set(note.staff, []);
       byStaff.get(note.staff).push(note);
     }
+    let systemEndBeat = systemStartBeat;
     for (const [staff, staffNotes] of byStaff) {
       staffNotes.sort((a, b) => a.centerX - b.centerX || a.centerY - b.centerY);
+      // Each staff advances independently. A four-beat bass note therefore
+      // sustains while the treble staff can play four quarter notes above it.
+      let staffBeat = systemStartBeat;
       for (let index = 0; index < staffNotes.length;) {
         const anchor = staffNotes[index].centerX, notesAtOnset = [];
         while (index < staffNotes.length && Math.abs(staffNotes[index].centerX - anchor) <= sameStaffTolerance) notesAtOnset.push(staffNotes[index++]);
-        columns.push({staff, hand: notesAtOnset[0].hand, x: anchor, notes: notesAtOnset});
+        const durationBeat = Math.max(...notesAtOnset.map(note => note.durationBeat));
+        const manuallyPlaced = notesAtOnset.map(note => note.startBeat).filter(Number.isFinite);
+        const startBeat = manuallyPlaced.length ? Math.min(...manuallyPlaced) : staffBeat;
+        events.push({startBeat, durationBeat, notes: notesAtOnset});
+        staffBeat = Math.max(staffBeat, startBeat + durationBeat);
       }
+      systemEndBeat = Math.max(systemEndBeat, staffBeat);
     }
-    columns.sort((a, b) => a.x - b.x);
-    while (columns.length) {
-      const base = columns.shift(), paired = [base];
-      // Pair at most one onset column from each other staff. This preserves an
-      // eighth-note right hand against a quarter-note left hand.
-      for (let index = 0; index < columns.length;) {
-        const candidate = columns[index];
-        if (candidate.staff !== base.staff && Math.abs(candidate.x - base.x) <= handPairTolerance && !paired.some(column => column.staff === candidate.staff)) {
-          paired.push(candidate); columns.splice(index, 1);
-        } else index++;
-      }
-      const chord = paired.flatMap(column => column.notes);
-      const durationBeat = Math.max(...chord.map(note => note.durationBeat));
-      const manuallyPlaced = chord.map(note => note.startBeat).filter(Number.isFinite);
-      const startBeat = manuallyPlaced.length ? Math.min(...manuallyPlaced) : beat;
-      events.push({startBeat, durationBeat, notes: chord});
-      beat = Math.max(beat, startBeat + durationBeat);
-    }
+    systemStartBeat = systemEndBeat;
   }
-  return events.sort((a, b) => a.startBeat - b.startBeat);
+  // Merge equal beats after both hands have their own timeline. The player then
+  // starts a two-hand onset together without making one hand wait for the other.
+  const merged = [];
+  for (const event of events.sort((a, b) => a.startBeat - b.startBeat)) {
+    const previous = merged[merged.length - 1];
+    if (previous && Math.abs(previous.startBeat - event.startBeat) < .001) {
+      previous.notes.push(...event.notes);
+      previous.durationBeat = Math.max(previous.durationBeat, event.durationBeat);
+    } else merged.push({...event, notes: [...event.notes]});
+  }
+  return merged;
 }
 export function scoreDataFromNotes(notes, tempo, staves = [], xTolerance = 10) {
   const events = buildPlaybackEvents(notes, staves, xTolerance);
