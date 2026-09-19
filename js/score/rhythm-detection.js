@@ -1,25 +1,25 @@
 // Rhythm hints are intentionally conservative. The user can correct each result in Score Lab.
 function ink(binary, width, height, x, y) {
-  return x >= 0 && x < width && y >= 0 && y < height ? binary[Math.round(y) * width + Math.round(x)] : 0;
+  x = Math.round(x); y = Math.round(y);
+  return x >= 0 && x < width && y >= 0 && y < height ? binary[y * width + x] : 0;
 }
 
 function verticalRun(binary, width, height, x, y, direction, limit) {
-  let run = 0;
+  let run = 0, gaps = 0;
   for (let distance = 0; distance <= limit; distance++) {
-    if (ink(binary, width, height, x, y + direction * distance)) run++;
-    else if (distance > 2) break;
+    if (ink(binary, width, height, x, y + direction * distance)) { run = distance + 1; gaps = 0; }
+    else if (++gaps > 2) break;
   }
   return run;
 }
 
 function findStem(binary, width, height, head, spacing) {
-  const maximum = Math.round(spacing * 4.5), minimum = Math.round(spacing * 1.35);
-  const positions = [
-    {side: 'up', direction: -1, x: head.x + head.width + 1, y: head.centerY},
-    {side: 'up', direction: -1, x: head.x + head.width - 2, y: head.centerY},
-    {side: 'down', direction: 1, x: head.x - 1, y: head.centerY},
-    {side: 'down', direction: 1, x: head.x + 1, y: head.centerY}
-  ];
+  const maximum = Math.round(spacing * 5), minimum = Math.round(spacing * 1.8);
+  const positions = [];
+  for (const direction of [-1, 1]) for (let offset = .3; offset <= .9; offset += .07) {
+    positions.push({side: direction < 0 ? 'up' : 'down', direction,
+      x: head.centerX - direction * spacing * offset, y: head.centerY + direction * spacing * .25});
+  }
   let best = null;
   for (const position of positions) {
     const run = verticalRun(binary, width, height, position.x, position.y, position.direction, maximum);
@@ -48,18 +48,17 @@ export function enrichNoteRhythm(binary, width, height, heads, staves) {
   return heads.map(head => {
     const staff = staffMap.get(head.staff), stem = findStem(binary, width, height, head, staff.spacing);
     const flagged = head.kind === 'filled' && hasFlagOrBeam(binary, width, height, stem, staff.spacing);
-    // A stem can disappear during staff-line removal. Treat a hollow head as a
-    // half note unless the user explicitly changes it, rather than overextending
-    // playback by guessing a whole note.
-    const durationBeat = head.kind === 'hollow' ? 2 : (flagged ? .5 : 1);
+    const durationBeat = head.whole ? 4 : (head.kind === 'hollow' ? 2 : (flagged ? .5 : 1));
     const rhythmConfidence = head.kind === 'hollow'
-      ? (stem ? .76 : .66)
+      ? (head.whole ? .66 : (stem ? .76 : .42))
       : (stem ? (flagged ? .63 : .78) : .42);
-    // Notes sit on a staff line or space. A filled head without a stem is generally
-    // punctuation or text after staff-line removal, so do not play it automatically.
+    // Notes sit on a staff line or space. A crisp filled oval can remain valid
+    // when its thin stem is lost in a beam or staff line; weaker shapes still need
+    // a stem so finger numbers and printed symbols do not enter playback.
     const gridAligned = head.alignmentError <= .32;
-    const structuralEvidence = Boolean(stem);
-    const confidence = Math.min(head.confidence, rhythmConfidence) * (gridAligned ? 1 : .55);
+    const structuralEvidence = Boolean(stem) || (head.whole && head.shapeFit >= .84) ||
+      (head.kind === 'filled' && head.shapeFit >= .84);
+    const confidence = head.confidence * (gridAligned ? 1 : .55) * (structuralEvidence ? 1 : .5);
     const accepted = head.accepted && gridAligned && structuralEvidence && confidence >= .5;
     return {...head, confidence, accepted, rhythm: {durationBeat, confidence: rhythmConfidence,
       gridAligned, stem: stem ? {side: stem.side, length: stem.length} : null, flagged}};

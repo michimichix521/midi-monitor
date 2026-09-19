@@ -1,8 +1,8 @@
 import {grayscale, binarize, reduceNoise, removeStaffLines} from './image-processing.js';
-import {detectStaves} from './staff-detection.js';
+import {detectStaves} from './staff-detection.js?v=2';
 import {connectedComponents} from './components.js';
-import {detectNoteHeads} from './note-detection.js?v=2';
-import {enrichNoteRhythm} from './rhythm-detection.js?v=4';
+import {detectNoteHeads} from './note-detection.js?v=3';
+import {enrichNoteRhythm} from './rhythm-detection.js?v=5';
 
 self.onmessage = ({data: {rgba, width, height, settings}}) => {
   try {
@@ -17,7 +17,7 @@ self.onmessage = ({data: {rgba, width, height, settings}}) => {
     progress('components');
     const {components, truncated} = connectedComponents(cleaned, width, height, settings.minArea);
     progress('heads');
-    const heads = enrichNoteRhythm(cleaned, width, height, detectNoteHeads(cleaned, width, height, staves, settings.minConfidence), staves);
+    const heads = enrichNoteRhythm(binary, width, height, detectNoteHeads(cleaned, width, height, staves, settings.minConfidence, binary), staves);
     const result = {width, height, gray, binary, cleaned, projection, lines, staves, components, truncated, heads, settings};
     self.postMessage({type: 'result', result}, [gray.buffer, binary.buffer, cleaned.buffer, projection.buffer]);
   } catch (error) { self.postMessage({type: 'error', message: String(error.message || error)}); }

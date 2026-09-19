@@ -55,6 +55,7 @@ export class ScoreView {
     }
     const notesById = new Map((options.notes || []).map(note => [note.id, note]));
     if (options.heads) for (const head of result.heads) {
+      if (!head.accepted && !options.showLowConfidence && head.id !== selected) continue;
       ctx.strokeStyle = head.id === selected ? '#165aca' : color(head.accepted ? '--head' : '--low');
       ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = head.id === selected ? 4 : 2;
       ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);

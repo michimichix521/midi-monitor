@@ -31,6 +31,7 @@ const english = {
   '黒画素の塊': 'Components',
   '横方向の黒画素数': 'Horizontal projection',
   '音符頭候補と番号': 'Note-head candidates and IDs',
+  '低信頼度候補も表示': 'Show lower-confidence candidates',
   '楽譜と検出結果': 'Score and detection results',
   '前へ': 'Previous', '次へ': 'Next', 'ページ': 'Page', '画像': 'Image',
   '原画像': 'Original', 'グレースケール': 'Grayscale', '二値化': 'Binary', '五線除去後': 'Staff lines removed',

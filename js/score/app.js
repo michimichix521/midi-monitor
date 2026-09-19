@@ -1,8 +1,8 @@
 import {ScorePDF} from './pdf.js';
-import {ScoreView, renderInspector} from './ui.js?v=5';
+import {ScoreView, renderInspector} from './ui.js?v=6';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
-import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=4';
+import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=5';
 import {ScorePlayer} from './playback.js';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
@@ -42,7 +42,8 @@ function controls() {
 function draw() {
   view.draw(source, result, {mode: $('view').value, debug: $('debug').checked,
     staves: $('show-staves').checked, lines: $('show-lines').checked, components: $('show-components').checked,
-    projection: $('show-projection').checked, heads: $('show-heads').checked, notes: result?.playNotes || []}, selected);
+    projection: $('show-projection').checked, heads: $('show-heads').checked,
+    showLowConfidence: $('show-low-confidence').checked, notes: result?.playNotes || []}, selected);
 }
 function updateScore() {
   if (!result) { events = []; renderPlayback(); return; }
@@ -151,7 +152,7 @@ $('analyze').addEventListener('click', () => {
     }
   }
   try {
-    worker = new Worker(new URL('./analysis-worker.js?v=2', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./analysis-worker.js?v=3', import.meta.url), {type: 'module'});
     busy = true; result = null; selected = null; controls(); choose(null);
     const stages = {preprocess: 'グレースケール化・二値化を行っています…', staves: '五線を検出しています…',
       components: '黒画素の塊を検出しています…', heads: '音符頭の候補を探しています…'};
@@ -176,7 +177,7 @@ $('analysis-settings').addEventListener('input', () => {
   $('threshold-value').value = $('threshold').value; controls();
   if (result) status('設定が変わりました。「このページを解析」を押して更新してください。');
 });
-for (const id of ['view', 'debug', 'show-staves', 'show-lines', 'show-components', 'show-projection', 'show-heads']) $(id).addEventListener('change', draw);
+for (const id of ['view', 'debug', 'show-staves', 'show-lines', 'show-components', 'show-projection', 'show-heads', 'show-low-confidence']) $(id).addEventListener('change', draw);
 $('actual-size').addEventListener('change', () => $('canvas-stack').classList.toggle('actual', $('actual-size').checked));
 $('tempo').addEventListener('change', () => { if ($('tempo').checkValidity()) renderPlayback(); });
 $('chord-tolerance').addEventListener('change', () => { if ($('chord-tolerance').checkValidity()) updateScore(); });
