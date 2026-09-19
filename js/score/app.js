@@ -13,6 +13,7 @@ const $ = id => document.getElementById(id);
 const pdf = new ScorePDF(), view = new ScoreView($('page-canvas'), $('overlay-canvas'));
 let source = null, result = null, selected = null, worker = null, busy = false;
 const pageSources = new Map();
+const pagePreviews = new Map();
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
 let clefs = {}, events = [], isPlaying = false, addingNote = false;
@@ -77,6 +78,29 @@ function draw() {
     projection: $('show-projection').checked, heads: $('show-heads').checked,
     showLowConfidence: $('show-low-confidence').checked, notes: result?.playNotes || []}, selected);
 }
+function drawPreviewOverlay(page, analysis) {
+  const preview = pagePreviews.get(page);
+  if (!preview || !analysis) return;
+  preview.querySelector('.preview-overlay')?.remove();
+  const overlay = document.createElement('canvas'); overlay.className = 'preview-overlay';
+  overlay.width = analysis.width; overlay.height = analysis.height;
+  const ctx = overlay.getContext('2d'), notes = new Map((analysis.playNotes || []).map(note => [note.id, note]));
+  ctx.lineWidth = 2; ctx.font = '16px sans-serif';
+  for (const staff of analysis.staves) {
+    ctx.strokeStyle = '#e74654aa';
+    for (const line of staff.lines) { ctx.beginPath(); ctx.moveTo(staff.left, line.y); ctx.lineTo(staff.right, line.y); ctx.stroke(); }
+  }
+  for (const head of analysis.heads) {
+    if (!head.accepted) continue;
+    const note = notes.get(head.id); ctx.strokeStyle = '#008b87'; ctx.fillStyle = '#008b87';
+    ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);
+    ctx.fillText(note ? `${head.id} · ${note.step}${note.octave}` : String(head.id), head.x, head.y - 7);
+  }
+  preview.querySelector('.preview-canvas').append(overlay);
+}
+function drawAllPreviewOverlays() {
+  for (const [page, analysis] of pageAnalyses) if (page !== 1) drawPreviewOverlay(page, analysis);
+}
 function updateScore() {
   if (!result) { events = []; renderPlayback(); return; }
   result.playNotes = prepareScore(result, clefs);
@@ -88,7 +112,7 @@ function updateScore() {
     events.push(...pageEvents.map(event => ({...event, startBeat: event.startBeat + offset})));
     offset += pageEvents.length ? Math.max(...pageEvents.map(event => event.startBeat + event.durationBeat)) : 0;
   }
-  renderInspector(result, selected, choose, updateHead); renderPlayback(); draw(); controls();
+  renderInspector(result, selected, choose, updateHead); renderPlayback(); draw(); drawAllPreviewOverlays(); controls();
 }
 function choose(id) { selected = id; renderInspector(result, selected, choose, updateHead); draw(); }
 function updateHead(id, changes) {
@@ -146,14 +170,15 @@ async function renderPage(pageNumber) {
   status('{page} / {count}ページを表示しました。「このページを解析」を押してください。', {page: currentPage, count: pageCount});
 }
 async function renderAllPages() {
-  pageSources.clear(); $('additional-pages').replaceChildren();
+  pageSources.clear(); pagePreviews.clear(); $('additional-pages').replaceChildren();
   status('全{count}ページを表示しています…', {count: pageCount});
   for (let page = 1; page <= pageCount; page++) {
     const canvas = await pdf.render(page); pageSources.set(page, canvas);
     if (page === 1) { source = canvas; continue; }
-    const preview = document.createElement('section'); preview.className = 'page-preview';
+    const preview = document.createElement('section'); preview.className = 'page-preview'; pagePreviews.set(page, preview);
     const label = document.createElement('p'); label.textContent = `${t('ページ')} ${page} / ${pageCount}`;
-    preview.append(label, canvas); $('additional-pages').append(preview);
+    const holder = document.createElement('div'); holder.className = 'preview-canvas'; holder.append(canvas);
+    preview.append(label, holder); $('additional-pages').append(preview);
   }
   currentPage = 1; result = pageAnalyses.get(1) || null; selected = null;
   $('placeholder').hidden = true; $('all-pages').hidden = false; $('canvas-scroll').scrollTop = 0;
