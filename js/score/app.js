@@ -2,7 +2,7 @@ import {ScorePDF} from './pdf.js';
 import {ScoreView, renderInspector} from './ui.js?v=6';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
-import {prepareScore, buildPlaybackEvents, scoreDataFromNotes} from './pitch.js?v=7';
+import {prepareScore, buildPlaybackEvents} from './pitch.js?v=7';
 import {ScorePlayer} from './playback.js';
 import {ScoreMidiInput} from './midi-input.js';
 import {PerformanceJudge} from './judge.js';
@@ -15,6 +15,7 @@ let source = null, result = null, selected = null, worker = null, busy = false;
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
 let clefs = {}, events = [], isPlaying = false, addingNote = false;
+const pageAnalyses = new Map();
 let midiConnected = false, judge = null, judging = false;
 const midi = new ScoreMidiInput(handleMidi, names => {
   midiConnected = names.length > 0;
@@ -30,6 +31,7 @@ function status(key, values = {}, error = false) {
 function controls() {
   $('pdf-file').disabled = busy; $('sample').disabled = busy;
   $('analyze').disabled = busy || !source;
+  $('analyze-all').disabled = busy || !pageCount;
   $('previous').disabled = busy || currentPage <= 1 || !pageCount;
   $('next').disabled = busy || currentPage >= pageCount;
   $('page-number').disabled = busy || !pageCount;
@@ -77,7 +79,14 @@ function draw() {
 function updateScore() {
   if (!result) { events = []; renderPlayback(); return; }
   result.playNotes = prepareScore(result, clefs);
-  events = buildPlaybackEvents(result.playNotes, result.staves, result.measures, Number($('chord-tolerance').value));
+  pageAnalyses.set(currentPage, result);
+  let offset = 0; events = [];
+  for (const [, page] of [...pageAnalyses].sort((a, b) => a[0] - b[0])) {
+    page.playNotes = prepareScore(page, clefs);
+    const pageEvents = buildPlaybackEvents(page.playNotes, page.staves, page.measures, Number($('chord-tolerance').value));
+    events.push(...pageEvents.map(event => ({...event, startBeat: event.startBeat + offset})));
+    offset += pageEvents.length ? Math.max(...pageEvents.map(event => event.startBeat + event.durationBeat)) : 0;
+  }
   renderInspector(result, selected, choose, updateHead); renderPlayback(); draw(); controls();
 }
 function choose(id) { selected = id; renderInspector(result, selected, choose, updateHead); draw(); }
@@ -90,7 +99,7 @@ function updateHead(id, changes) {
   updateScore();
 }
 function renderPlayback() {
-  const notes = result?.playNotes || [];
+  const notes = pageAnalyses.size ? [...pageAnalyses.values()].flatMap(page => page.playNotes || []) : (result?.playNotes || []);
   $('playable-count').textContent = notes.filter(note => note.included).length || '—';
   $('event-count').textContent = events.length || '—';
   $('estimated-beats').textContent = events.length ? Math.max(...events.map(event => event.startBeat + event.durationBeat)).toFixed(2) : '—';
@@ -112,7 +121,7 @@ function refreshText() {
 }
 function resetPage() {
   source = null; result = null; selected = null;
-  events = []; clefs = {}; addingNote = false; player.stop();
+  addingNote = false; player.stop();
   view.lastSource = null; view.lastResult = null;
   $('canvas-stack').hidden = true; $('placeholder').hidden = false;
   $('page-canvas').width = 0; $('page-canvas').height = 0;
@@ -129,13 +138,15 @@ async function renderPage(pageNumber) {
   status('{page}ページ目を表示しています…', {page: pageNumber});
   source = await pdf.render(pageNumber);
   currentPage = pageNumber;
+  result = pageAnalyses.get(pageNumber) || null;
   $('placeholder').hidden = true; $('canvas-stack').hidden = false;
   $('canvas-scroll').scrollTop = 0; $('canvas-scroll').scrollLeft = 0;
-  draw();
+  draw(); if (result) updateScore();
   status('{page} / {count}ページを表示しました。「このページを解析」を押してください。', {page: currentPage, count: pageCount});
 }
 async function loadPDF(bytes, name, sample = false) {
   busy = true; pageCount = 0; currentPage = 1; fileName = name; isSample = sample;
+  pageAnalyses.clear(); events = []; clefs = {};
   resetPage(); controls(); refreshText(); status('PDFを読み込んでいます…');
   try {
     pageCount = await pdf.open(bytes);
@@ -200,6 +211,34 @@ $('analyze').addEventListener('click', () => {
   } catch {
     finishWorker(); status('解析を開始できませんでした。このブラウザーでWeb Workerが利用できるか確認してください。', {}, true);
   }
+});
+function analyzeCanvas(canvas, page) {
+  return new Promise((resolve, reject) => {
+    worker = new Worker(new URL('./analysis-worker.js?v=3', import.meta.url), {type: 'module'});
+    worker.onmessage = ({data}) => {
+      if (data.type === 'progress') status(`${page} / ${pageCount} ${t('解析中')}…`);
+      if (data.type === 'result') { worker.terminate(); worker = null; resolve(data.result); }
+      if (data.type === 'error') { worker.terminate(); worker = null; reject(new Error(data.message)); }
+    };
+    worker.onerror = () => { worker?.terminate(); worker = null; reject(new Error('worker')); };
+    const image = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    worker.postMessage({rgba: image.data.buffer, width: image.width, height: image.height, settings: settings()}, [image.data.buffer]);
+  });
+}
+$('analyze-all').addEventListener('click', async () => {
+  if (busy || !pageCount) return;
+  busy = true; controls(); pageAnalyses.clear(); events = [];
+  try {
+    for (let page = 1; page <= pageCount; page++) {
+      status('{page} / {count}ページを解析しています…', {page, count: pageCount});
+      const canvas = page === currentPage ? source : await pdf.render(page);
+      pageAnalyses.set(page, await analyzeCanvas(canvas, page));
+    }
+    result = pageAnalyses.get(currentPage) || null; selected = null; updateScore();
+    status('全{count}ページを解析し、連続した採点対象にしました。', {count: pageCount});
+  } catch {
+    status('全ページの解析に失敗しました。設定を調整して再試行してください。', {}, true);
+  } finally { worker?.terminate(); worker = null; busy = false; controls(); }
 });
 $('cancel').addEventListener('click', () => { finishWorker(); status('解析を中止しました。'); });
 $('analysis-settings').addEventListener('input', () => {
@@ -268,8 +307,8 @@ $('export').addEventListener('click', () => {
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 $('export-score').addEventListener('click', () => {
-  if (!result?.playNotes?.length) return;
-  const data = scoreDataFromNotes(result.playNotes, Number($('tempo').value), result.staves, result.measures, Number($('chord-tolerance').value));
+  if (!events.length) return;
+  const data = {tempo: Number($('tempo').value), timeSignature: {numerator: 4, denominator: 4}, notes: events.flatMap(event => event.notes.map(note => ({id: note.id, midi: note.midi, startBeat: event.startBeat, durationBeat: note.durationBeat, measure: Math.floor(event.startBeat / 4) + 1, staff: note.staff, hand: note.hand, confidence: note.confidence})))};
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
   const link = document.createElement('a'); link.href = url; link.download = `score-playback-page-${currentPage}.json`;
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);

@@ -98,6 +98,7 @@ const english = {
   ,'総合スコア': 'Total score', '音程精度': 'Pitch accuracy', 'タイミング精度': 'Timing accuracy', '音価精度': 'Duration accuracy', '余分な音': 'Extra notes'
   ,'MIDI接続済み': 'MIDI connected', 'MIDI入力が見つかりません': 'No MIDI input found', 'MIDI接続に失敗しました。HTTPS対応ブラウザーで確認してください。': 'Could not connect MIDI. Use an HTTPS browser with Web MIDI support.'
   ,'判定時間を小さい順に設定してください': 'Set timing limits in ascending order', '演奏中': 'Performing', '採点結果': 'Results', '平均タイミング誤差': 'Average timing error', '最大タイミング誤差': 'Maximum timing error', '演奏ノート数': 'Played notes', '正解ノート数': 'Expected notes'
+  ,'全ページを解析して採点対象にする': 'Analyze all pages for grading', '解析中': 'Analyzing', '{page} / {count}ページを解析しています…': 'Analyzing page {page} of {count}…', '全{count}ページを解析し、連続した採点対象にしました。': 'Analyzed all {count} pages as one continuous performance.', '全ページの解析に失敗しました。設定を調整して再試行してください。': 'Could not analyze every page. Adjust settings and try again.'
 };
 let language = 'ja';
 try { if (localStorage.getItem('midi-monitor-language') === 'en') language = 'en'; } catch {}
