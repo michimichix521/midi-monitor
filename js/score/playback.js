@@ -14,9 +14,11 @@ export class ScorePlayer {
     const context = this.context, osc = context.createOscillator(), gain = context.createGain();
     osc.type = 'triangle'; osc.frequency.value = 440 * 2 ** ((midi - 69) / 12);
     gain.gain.setValueAtTime(0, start);
-    gain.gain.linearRampToValueAtTime(.18 * velocity, start + .012);
-    gain.gain.setTargetAtTime(.08 * velocity, start + .08, .16);
-    gain.gain.setTargetAtTime(0, Math.max(start + .05, start + duration - .08), .05);
+    const level = .16 * velocity, releaseAt = Math.max(start + .06, start + duration - .045);
+    gain.gain.linearRampToValueAtTime(level, start + .012);
+    // Keep sustained notes audible until their detected or measure-adjusted end.
+    gain.gain.setValueAtTime(level, releaseAt);
+    gain.gain.setTargetAtTime(0, releaseAt, .025);
     osc.connect(gain); gain.connect(this.master); this.voices.add(osc);
     osc.onended = () => { osc.disconnect(); gain.disconnect(); this.voices.delete(osc); };
     osc.start(start); osc.stop(start + Math.max(.08, duration));

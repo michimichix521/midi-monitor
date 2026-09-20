@@ -2,8 +2,8 @@ import {ScorePDF} from './pdf.js';
 import {ScoreView, renderInspector} from './ui.js?v=6';
 import {initLanguage, t} from './i18n.js';
 import {samplePDF} from './sample.js';
-import {prepareScore, buildPlaybackEvents} from './pitch.js?v=7';
-import {ScorePlayer} from './playback.js';
+import {prepareScore, buildPlaybackEvents} from './pitch.js?v=8';
+import {ScorePlayer} from './playback.js?v=2';
 import {ScoreMidiInput} from './midi-input.js';
 import {PerformanceJudge} from './judge.js';
 

@@ -78,13 +78,21 @@ export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 1
         for (let measure = 0; measure + 1 < measureGroup.boundaries.length; measure++) {
           const left = measureGroup.boundaries[measure], right = measureGroup.boundaries[measure + 1];
           const measureStart = systemStartBeat + measure * 4;
+          const inMeasure = columns.filter(column => column.x >= left && (measure + 2 === measureGroup.boundaries.length ? column.x <= right : column.x < right));
+          // The head classifier is only a hint. Make the inferred values fill the
+          // complete measure so a mistaken flag cannot leave an audible gap.
+          const raw = inMeasure.map(column => Math.max(.125, ...column.notes.map(note => note.durationBeat)));
+          const total = raw.reduce((sum, duration) => sum + duration, 0);
           let staffBeat = measureStart;
-          for (const column of columns.filter(column => column.x >= left && (measure + 2 === measureGroup.boundaries.length ? column.x <= right : column.x < right))) {
-            const durationBeat = Math.max(...column.notes.map(note => note.durationBeat));
+          for (let index = 0; index < inMeasure.length; index++) {
+            const column = inMeasure[index], durationBeat = total ? raw[index] / total * 4 : 0;
             const manual = column.notes.map(note => note.startBeat).filter(Number.isFinite);
             const startBeat = manual.length ? Math.min(...manual) : staffBeat;
-            events.push({startBeat, durationBeat: Math.min(durationBeat, Math.max(.125, measureStart + 4 - startBeat)), notes: column.notes});
-            staffBeat = Math.max(staffBeat, startBeat + durationBeat);
+            const remaining = Math.max(.125, measureStart + 4 - startBeat);
+            const scheduledDuration = Math.min(durationBeat, remaining);
+            events.push({startBeat, durationBeat: scheduledDuration,
+              notes: column.notes.map(note => ({...note, durationBeat: scheduledDuration}))});
+            staffBeat = Math.max(staffBeat, startBeat + scheduledDuration);
           }
         }
         systemEndBeat = Math.max(systemEndBeat, systemStartBeat + (measureGroup.boundaries.length - 1) * 4);
@@ -94,7 +102,7 @@ export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 1
           const durationBeat = Math.max(...column.notes.map(note => note.durationBeat));
           const manual = column.notes.map(note => note.startBeat).filter(Number.isFinite);
           const startBeat = manual.length ? Math.min(...manual) : staffBeat;
-          events.push({startBeat, durationBeat, notes: column.notes});
+          events.push({startBeat, durationBeat, notes: column.notes.map(note => ({...note, durationBeat}))});
           staffBeat = Math.max(staffBeat, startBeat + durationBeat);
         }
         systemEndBeat = Math.max(systemEndBeat, staffBeat);
