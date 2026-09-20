@@ -16,7 +16,7 @@ const pageSources = new Map();
 const pagePreviews = new Map();
 let currentPage = 1, pageCount = 0, fileName = '', isSample = false;
 let statusKey = 'PDFを選択するか、サンプルを開いてください。', statusValues = {}, statusError = false;
-let clefs = {}, events = [], isPlaying = false, addingNote = false;
+let clefs = {}, events = [], isPlaying = false, addingNote = false, activeNote = null;
 const pageAnalyses = new Map();
 let midiConnected = false, judge = null, judging = false;
 const midi = new ScoreMidiInput(handleMidi, names => {
@@ -24,7 +24,7 @@ const midi = new ScoreMidiInput(handleMidi, names => {
   $('midi-status').textContent = names.length ? `${t('MIDI接続済み')}：${names.join(', ')}` : t('MIDI入力が見つかりません');
   controls();
 });
-const player = new ScorePlayer(playing => { isPlaying = playing; controls(); });
+const player = new ScorePlayer(playing => { isPlaying = playing; if (!playing) { activeNote = null; draw(); drawAllPreviewOverlays(); } controls(); });
 
 function status(key, values = {}, error = false) {
   statusKey = key; statusValues = values; statusError = error;
@@ -76,7 +76,7 @@ function draw() {
   view.draw(source, result, {mode: $('view').value, debug: $('debug').checked,
     staves: $('show-staves').checked, lines: $('show-lines').checked, components: $('show-components').checked,
     projection: $('show-projection').checked, heads: $('show-heads').checked,
-    showLowConfidence: $('show-low-confidence').checked, notes: result?.playNotes || []}, selected);
+    showLowConfidence: $('show-low-confidence').checked, notes: result?.playNotes || []}, activeNote?.page === currentPage ? activeNote.id : selected);
 }
 function drawPreviewOverlay(page, analysis) {
   const preview = pagePreviews.get(page);
@@ -92,7 +92,8 @@ function drawPreviewOverlay(page, analysis) {
   }
   for (const head of analysis.heads) {
     if (!head.accepted) continue;
-    const note = notes.get(head.id); ctx.strokeStyle = '#008b87'; ctx.fillStyle = '#008b87';
+    const note = notes.get(head.id), active = activeNote?.page === page && activeNote.id === head.id;
+    ctx.strokeStyle = active ? '#165aca' : '#008b87'; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = active ? 4 : 2;
     ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);
     ctx.fillText(note ? `${head.id} · ${note.step}${note.octave}` : String(head.id), head.x, head.y - 7);
   }
@@ -106,8 +107,8 @@ function updateScore() {
   result.playNotes = prepareScore(result, clefs);
   pageAnalyses.set(currentPage, result);
   let offset = 0; events = [];
-  for (const [, page] of [...pageAnalyses].sort((a, b) => a[0] - b[0])) {
-    page.playNotes = prepareScore(page, clefs);
+  for (const [pageNumber, page] of [...pageAnalyses].sort((a, b) => a[0] - b[0])) {
+    page.playNotes = prepareScore(page, clefs).map(note => ({...note, page: pageNumber}));
     const selectedHands = page.playNotes.filter(note => (note.hand === 'right' ? $('include-right').checked : $('include-left').checked));
     const pageEvents = buildPlaybackEvents(selectedHands, page.staves, page.measures, Number($('chord-tolerance').value));
     events.push(...pageEvents.map(event => ({...event, startBeat: event.startBeat + offset})));
@@ -296,7 +297,9 @@ $('play').addEventListener('click', async () => {
   if (!events.length || !$('tempo').checkValidity()) return;
   try {
     await player.play(events, Number($('tempo').value), event => {
-      const current = event.notes[0]; choose(current?.id || null);
+      const current = event.notes[0];
+      activeNote = current ? {page: current.page, id: current.id} : null;
+      if (current?.page === currentPage) choose(current.id); else { draw(); drawAllPreviewOverlays(); }
       $('playback-status').textContent = current ? `${t('再生中')} · ${current.step}${current.octave} · MIDI ${current.midi}` : t('再生中');
     });
   } catch { $('playback-status').textContent = t('音声を開始できませんでした'); }
