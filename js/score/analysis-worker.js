@@ -4,6 +4,7 @@ import {connectedComponents} from './components.js';
 import {detectNoteHeads} from './note-detection.js?v=3';
 import {enrichNoteRhythm} from './rhythm-detection.js?v=5';
 import {detectMeasures} from './measure-detection.js?v=1';
+import {detectAccidentals, detectRests} from './symbol-detection.js?v=1';
 
 self.onmessage = ({data: {rgba, width, height, settings}}) => {
   try {
@@ -19,8 +20,10 @@ self.onmessage = ({data: {rgba, width, height, settings}}) => {
     progress('components');
     const {components, truncated} = connectedComponents(cleaned, width, height, settings.minArea);
     progress('heads');
-    const heads = enrichNoteRhythm(binary, width, height, detectNoteHeads(cleaned, width, height, staves, settings.minConfidence, binary), staves);
-    const result = {width, height, gray, binary, cleaned, projection, lines, staves, measures, components, truncated, heads, settings};
+    const rhythmicHeads = enrichNoteRhythm(binary, width, height, detectNoteHeads(cleaned, width, height, staves, settings.minConfidence, binary), staves);
+    const heads = detectAccidentals(components, rhythmicHeads, staves);
+    const rests = detectRests(components, heads, staves);
+    const result = {width, height, gray, binary, cleaned, projection, lines, staves, measures, components, truncated, heads, rests, settings};
     self.postMessage({type: 'result', result}, [gray.buffer, binary.buffer, cleaned.buffer, projection.buffer]);
   } catch (error) { self.postMessage({type: 'error', message: String(error.message || error)}); }
 };

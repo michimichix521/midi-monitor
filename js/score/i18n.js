@@ -88,7 +88,7 @@ const english = {
   '追加する音符頭を楽譜上でクリックしてください。': 'Click the note head to add.',
   '音符の追加を取り消しました。': 'Adding a note was canceled.',
   '音符を追加しました。MIDI番号・開始拍・長さを確認してください。': 'Note added. Check its MIDI number, start beat, and duration.',
-  '推定MIDI番号': 'Estimated MIDI number', '推定音名': 'Estimated note name', '長さ（拍）': 'Duration (beats)',
+  '推定MIDI番号': 'Estimated MIDI number', '推定音名': 'Estimated note name', '臨時記号': 'Accidental', '長さ（拍）': 'Duration (beats)',
   '開始拍（空欄で自動）': 'Start beat (blank = automatic)', '音価の推定': 'Rhythm estimate', '拍': 'beats', '自動': 'automatic',
   '旗・連桁あり': 'flag or beam detected', '旗・連桁なし': 'no flag or beam detected',
   '再生に含める': 'Include in playback', '推定値に戻す': 'Restore estimate'

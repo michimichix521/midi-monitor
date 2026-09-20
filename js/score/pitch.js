@@ -43,13 +43,15 @@ export function prepareScore(result, clefs = {}, page = 1, keySignature = 'none'
   return result.heads.map(head => {
     const staff = staves.get(head.staff), clef = clefs[`${page}:${head.staff}`] || clefs[head.staff] || (head.staff % 2 ? 'treble' : 'bass');
     const inferred = inferPitch(head, staff, clef, keySignature);
-    const midi = Number.isInteger(head.midi) ? head.midi : inferred.midi;
+    const detectedAccidental = Number.isInteger(head.accidental) ? head.accidental : null;
+    const inferredMidi = detectedAccidental === null ? inferred.midi : pitchToMidi(inferred.step, inferred.octave, detectedAccidental);
+    const midi = Number.isInteger(head.midi) ? head.midi : inferredMidi;
     const hand = clef === 'bass' ? 'left' : 'right';
     return {...head, clef, hand, ...inferred, midi, startBeat: Number.isFinite(head.startBeat) ? head.startBeat : null, durationBeat: Number.isFinite(head.durationBeat) ? head.durationBeat : inferDuration(head), included: head.included === undefined ? head.accepted : head.included};
   });
 }
 
-export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 10) {
+export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 10, rests = []) {
   const staffSpacing = staves.length ? staves.reduce((sum, staff) => sum + staff.spacing, 0) / staves.length : 0;
   const sameStaffTolerance = Math.max(xTolerance, staffSpacing * .55);
   // Staff gaps larger than fourteen line spaces are treated as a new system.
@@ -84,6 +86,8 @@ export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 1
         while (index < staffNotes.length && Math.abs(staffNotes[index].centerX - anchor) <= sameStaffTolerance) notesAtOnset.push(staffNotes[index++]);
         columns.push({x: anchor, notes: notesAtOnset});
       }
+      for (const rest of rests.filter(rest => rest.staff === staff)) columns.push({x: rest.centerX, notes: [], rest});
+      columns.sort((a, b) => a.x - b.x);
       if (measureGroup) {
         for (let measure = 0; measure + 1 < measureGroup.boundaries.length; measure++) {
           const left = measureGroup.boundaries[measure], right = measureGroup.boundaries[measure + 1];
@@ -91,7 +95,7 @@ export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 1
           const inMeasure = columns.filter(column => column.x >= left && (measure + 2 === measureGroup.boundaries.length ? column.x <= right : column.x < right));
           // The head classifier is only a hint. Make the inferred values fill the
           // complete measure so a mistaken flag cannot leave an audible gap.
-          const raw = inMeasure.map(column => Math.max(.125, ...column.notes.map(note => note.durationBeat)));
+          const raw = inMeasure.map(column => column.rest ? column.rest.durationBeat : Math.max(.125, ...column.notes.map(note => note.durationBeat)));
           const total = raw.reduce((sum, duration) => sum + duration, 0);
           let staffBeat = measureStart;
           for (let index = 0; index < inMeasure.length; index++) {
@@ -100,7 +104,7 @@ export function buildPlaybackEvents(notes, staves, measures = [], xTolerance = 1
             const startBeat = manual.length ? Math.min(...manual) : staffBeat;
             const remaining = Math.max(.125, measureStart + 4 - startBeat);
             const scheduledDuration = Math.min(durationBeat, remaining);
-            events.push({startBeat, durationBeat: scheduledDuration,
+            events.push({startBeat, durationBeat: scheduledDuration, rest: column.rest || null,
               notes: column.notes.map(note => ({...note, durationBeat: scheduledDuration}))});
             staffBeat = Math.max(staffBeat, startBeat + scheduledDuration);
           }

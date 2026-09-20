@@ -61,6 +61,15 @@ export class ScoreView {
       ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);
       const note = notesById.get(head.id);
       ctx.fillText(note ? `${head.id} · ${note.step}${note.octave}` : String(head.id), head.x, head.y - 7);
+      if (head.detectedAccidental) {
+        ctx.fillStyle = '#8d54c8';
+        ctx.fillText(head.detectedAccidental.value > 0 ? '♯' : '?♭', head.x - 14, head.y + head.height + 14);
+      }
+    }
+    for (const rest of result.rests || []) {
+      ctx.strokeStyle = '#6c6478'; ctx.lineWidth = 2;
+      ctx.strokeRect(rest.x - 2, rest.y - 2, rest.width + 4, rest.height + 4);
+      ctx.fillStyle = '#6c6478'; ctx.fillText(`rest ${rest.durationBeat}`, rest.x, rest.y - 6);
     }
     ctx.restore();
   }
@@ -103,15 +112,19 @@ export function renderInspector(result, selected, choose, updateHead = () => {})
   if (!note) return;
   const editor = document.createElement('div'); editor.className = 'candidate-editor';
   const midi = document.createElement('input'); midi.type = 'number'; midi.min = '0'; midi.max = '127'; midi.value = String(note.midi);
+  const accidental = document.createElement('select');
+  accidental.append(new Option(t('自動'), ''), new Option('♮', '0'), new Option('♭', '-1'), new Option('♯', '1'));
+  accidental.value = Number.isInteger(head.accidental) ? String(head.accidental) : '';
   const start = document.createElement('input'); start.type = 'number'; start.min = '0'; start.max = '999'; start.step = '.125'; start.placeholder = t('自動'); start.value = note.startBeat ?? '';
   const duration = document.createElement('input'); duration.type = 'number'; duration.min = '.125'; duration.max = '16'; duration.step = '.125'; duration.value = String(note.durationBeat);
   const included = document.createElement('input'); included.type = 'checkbox'; included.checked = note.included;
   const field = (label, input) => { const row = document.createElement('label'), text = document.createElement('span'); text.textContent = t(label); row.append(text, input); return row; };
-  editor.append(field('推定MIDI番号', midi), field('推定音名', Object.assign(document.createElement('output'), {textContent: `${note.step}${note.octave}`})), field('開始拍（空欄で自動）', start), field('長さ（拍）', duration));
+  editor.append(field('推定MIDI番号', midi), field('推定音名', Object.assign(document.createElement('output'), {textContent: `${note.step}${note.octave}`})), field('臨時記号', accidental), field('開始拍（空欄で自動）', start), field('長さ（拍）', duration));
   const toggle = document.createElement('label'); toggle.className = 'check'; const text = document.createElement('span'); text.textContent = t('再生に含める'); toggle.append(included, text); editor.append(toggle);
   const reset = document.createElement('button'); reset.type = 'button'; reset.className = 'secondary'; reset.textContent = t('推定値に戻す'); editor.append(reset);
   const save = () => updateHead(head.id, {midi: Number(midi.value), startBeat: start.value === '' ? null : Number(start.value), durationBeat: Number(duration.value), included: included.checked});
   midi.addEventListener('change', save); start.addEventListener('change', save); duration.addEventListener('change', save); included.addEventListener('change', save);
-  reset.addEventListener('click', () => updateHead(head.id, {midi: null, startBeat: null, durationBeat: null, included: true}));
+  accidental.addEventListener('change', () => updateHead(head.id, {midi: null, accidental: accidental.value === '' ? null : Number(accidental.value)}));
+  reset.addEventListener('click', () => updateHead(head.id, {midi: null, accidental: null, startBeat: null, durationBeat: null, included: true}));
   $('candidate-detail').append(editor);
 }

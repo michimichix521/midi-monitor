@@ -96,6 +96,11 @@ function drawPreviewOverlay(page, analysis) {
     ctx.strokeStyle = active ? '#165aca' : '#008b87'; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = active ? 4 : 2;
     ctx.strokeRect(head.x - 3, head.y - 3, head.width + 6, head.height + 6);
     ctx.fillText(note ? `${head.id} · ${note.step}${note.octave}` : String(head.id), head.x, head.y - 7);
+    if (head.detectedAccidental) { ctx.fillStyle = '#8d54c8'; ctx.fillText(head.detectedAccidental.value > 0 ? '♯' : '?♭', head.x - 14, head.y + head.height + 14); }
+  }
+  for (const rest of analysis.rests || []) {
+    ctx.strokeStyle = '#6c6478'; ctx.lineWidth = 2; ctx.strokeRect(rest.x - 2, rest.y - 2, rest.width + 4, rest.height + 4);
+    ctx.fillStyle = '#6c6478'; ctx.fillText(`rest ${rest.durationBeat}`, rest.x, rest.y - 6);
   }
   preview.querySelector('.preview-canvas').replaceChildren(composite);
 }
@@ -110,7 +115,7 @@ function updateScore() {
   for (const [pageNumber, page] of [...pageAnalyses].sort((a, b) => a[0] - b[0])) {
     page.playNotes = prepareScore(page, clefs, pageNumber, $('key-signature').value).map(note => ({...note, page: pageNumber}));
     const selectedHands = page.playNotes.filter(note => (note.hand === 'right' ? $('include-right').checked : $('include-left').checked));
-    const pageEvents = buildPlaybackEvents(selectedHands, page.staves, page.measures, Number($('chord-tolerance').value));
+    const pageEvents = buildPlaybackEvents(selectedHands, page.staves, page.measures, Number($('chord-tolerance').value), page.rests || []);
     events.push(...pageEvents.map(event => ({...event, startBeat: event.startBeat + offset})));
     offset += pageEvents.length ? Math.max(...pageEvents.map(event => event.startBeat + event.durationBeat)) : 0;
   }
