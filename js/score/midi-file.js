@@ -60,9 +60,10 @@ export function synchronizeHands(score) {
     const measure = Math.floor(note.startBeat / measureLength);
     const candidates = rightOnsets.filter(onset => Math.floor(onset / measureLength) === measure);
     const closest = candidates.reduce((best, onset) => !best || Math.abs(onset - note.startBeat) < Math.abs(best - note.startBeat) ? onset : best, null);
-    // Keep genuine long pauses intact. Nearby accompaniment onsets are aligned
-    // so independently exported left/right tracks do not alternate in playback.
-    return closest !== null && Math.abs(closest - note.startBeat) <= .75 ? {...note, startBeat: closest} : {...note};
+    // The explicit synchronization option treats each measure as a simultaneous
+    // two-hand phrase. Separate left/right exports can place matching onsets far
+    // apart in the event stream, so no distance limit is applied here.
+    return closest !== null ? {...note, startBeat: closest} : {...note};
   });
   const events = [];
   for (const note of notes.sort((a, b) => a.startBeat - b.startBeat || a.midi - b.midi)) {
