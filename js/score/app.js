@@ -226,7 +226,7 @@ $('pdf-file').addEventListener('change', async () => {
     } else await loadPDF(new Uint8Array(bytes), file.name);
   }
   catch (error) { busy = false; controls(); pdfError(error); }
-  finally { $('pdf-file').value = ''; }
+  finally { busy = false; controls(); $('pdf-file').value = ''; }
 });
 $('sample').addEventListener('click', () => { if (!busy) void loadPDF(samplePDF(), 'sample-score.pdf', true); });
 async function goToPage(number) {

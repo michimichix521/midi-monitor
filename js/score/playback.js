@@ -28,7 +28,8 @@ export class ScorePlayer {
     const secondsPerBeat = 60 / tempo, start = this.context.currentTime + .06;
     events.forEach(event => {
       const at = start + event.startBeat * secondsPerBeat;
-      event.notes.forEach(note => this.tone(note.midi, at, note.durationBeat * secondsPerBeat));
+      event.notes.forEach(note => this.tone(note.midi, at, note.durationBeat * secondsPerBeat,
+        note.velocity > 1 ? note.velocity / 127 : (note.velocity || .7)));
       const timeout = Math.max(0, (at - this.context.currentTime) * 1000);
       setTimeout(() => onEvent(event), timeout);
     });
