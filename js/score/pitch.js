@@ -1,5 +1,14 @@
 const STEPS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const SEMITONES = {C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11};
+const SIGNATURES = {
+  none: {},
+  'sharp-1': {F: 1}, 'sharp-2': {F: 1, C: 1}, 'sharp-3': {F: 1, C: 1, G: 1},
+  'sharp-4': {F: 1, C: 1, G: 1, D: 1}, 'sharp-5': {F: 1, C: 1, G: 1, D: 1, A: 1},
+  'sharp-6': {F: 1, C: 1, G: 1, D: 1, A: 1, E: 1}, 'sharp-7': {F: 1, C: 1, G: 1, D: 1, A: 1, E: 1, B: 1},
+  'flat-1': {B: -1}, 'flat-2': {B: -1, E: -1}, 'flat-3': {B: -1, E: -1, A: -1},
+  'flat-4': {B: -1, E: -1, A: -1, D: -1}, 'flat-5': {B: -1, E: -1, A: -1, D: -1, G: -1},
+  'flat-6': {B: -1, E: -1, A: -1, D: -1, G: -1, C: -1}, 'flat-7': {B: -1, E: -1, A: -1, D: -1, G: -1, C: -1, F: -1}
+};
 
 export function pitchToMidi(step, octave, accidental = 0) {
   return (octave + 1) * 12 + SEMITONES[step] + accidental;
@@ -16,23 +25,24 @@ function diatonicOffset(step, octave, offset) {
 }
 
 // bottom line reference: treble E4, bass G2. Each staff position is one diatonic step.
-export function inferPitch(head, staff, clef = 'treble') {
+export function inferPitch(head, staff, clef = 'treble', keySignature = 'none') {
   const offset = Math.round((staff.bottom - head.centerY) / (staff.spacing / 2));
   const reference = clef === 'bass' ? {step: 'G', octave: 2} : {step: 'E', octave: 4};
   const pitch = diatonicOffset(reference.step, reference.octave, offset);
-  return {...pitch, midi: pitchToMidi(pitch.step, pitch.octave), staffSteps: offset};
+  const accidental = SIGNATURES[keySignature]?.[pitch.step] || 0;
+  return {...pitch, accidental, midi: pitchToMidi(pitch.step, pitch.octave, accidental), staffSteps: offset};
 }
 
 export function inferDuration(head) {
   return head.rhythm?.durationBeat ?? (head.kind === 'hollow' ? 2 : 1);
 }
 
-export function prepareScore(result, clefs = {}) {
+export function prepareScore(result, clefs = {}, page = 1, keySignature = 'none') {
   if (!result) return [];
   const staves = new Map(result.staves.map(staff => [staff.id, staff]));
   return result.heads.map(head => {
-    const staff = staves.get(head.staff), clef = clefs[head.staff] || (head.staff % 2 ? 'treble' : 'bass');
-    const inferred = inferPitch(head, staff, clef);
+    const staff = staves.get(head.staff), clef = clefs[`${page}:${head.staff}`] || clefs[head.staff] || (head.staff % 2 ? 'treble' : 'bass');
+    const inferred = inferPitch(head, staff, clef, keySignature);
     const midi = Number.isInteger(head.midi) ? head.midi : inferred.midi;
     const hand = clef === 'bass' ? 'left' : 'right';
     return {...head, clef, hand, ...inferred, midi, startBeat: Number.isFinite(head.startBeat) ? head.startBeat : null, durationBeat: Number.isFinite(head.durationBeat) ? head.durationBeat : inferDuration(head), included: head.included === undefined ? head.accepted : head.included};

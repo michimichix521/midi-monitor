@@ -81,7 +81,7 @@ const english = {
   'サンプル楽譜（2ページ）': 'Sample score (2 pages)',
   '④ 推定した音を確認する': '4. Review the estimated notes',
   '有力候補を、各段の左から右へ再生します。同じ横位置の候補は和音として同時に鳴らします。再生前に音部記号と個別のMIDI番号・長さを確認してください。': 'Likely candidates play left to right within each system. Candidates at the same horizontal position play as a chord. Check clefs plus individual MIDI numbers and durations before playback.',
-  'テンポ（BPM）': 'Tempo (BPM)', '和音とみなす横位置（px）': 'Chord x tolerance (px)', '推定音を再生': 'Play estimated notes', '停止': 'Stop', '採点用JSONを保存': 'Save score JSON',
+  'テンポ（BPM）': 'Tempo (BPM)', '和音とみなす横位置（px）': 'Chord x tolerance (px)', '調号': 'Key signature', 'なし（C / Am）': 'None (C / Am)', '推定音を再生': 'Play estimated notes', '停止': 'Stop', '採点用JSONを保存': 'Save score JSON',
   '再生対象の音符': 'playable notes', '再生イベント': 'playback events', '推定拍数': 'estimated beats', '五線': 'Staff', '音部記号': 'Clef',
   'ト音記号': 'Treble', 'ヘ音記号': 'Bass', '推定音高は要確認': 'Estimated pitches need review', '再生中': 'Playing',
   '音声を開始できませんでした': 'Could not start audio', '停止しました': 'Stopped',

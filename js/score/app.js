@@ -104,11 +104,11 @@ function drawAllPreviewOverlays() {
 }
 function updateScore() {
   if (!result) { events = []; renderPlayback(); return; }
-  result.playNotes = prepareScore(result, clefs);
+  result.playNotes = prepareScore(result, clefs, currentPage, $('key-signature').value);
   pageAnalyses.set(currentPage, result);
   let offset = 0; events = [];
   for (const [pageNumber, page] of [...pageAnalyses].sort((a, b) => a[0] - b[0])) {
-    page.playNotes = prepareScore(page, clefs).map(note => ({...note, page: pageNumber}));
+    page.playNotes = prepareScore(page, clefs, pageNumber, $('key-signature').value).map(note => ({...note, page: pageNumber}));
     const selectedHands = page.playNotes.filter(note => (note.hand === 'right' ? $('include-right').checked : $('include-left').checked));
     const pageEvents = buildPlaybackEvents(selectedHands, page.staves, page.measures, Number($('chord-tolerance').value));
     events.push(...pageEvents.map(event => ({...event, startBeat: event.startBeat + offset})));
@@ -135,8 +135,8 @@ function renderPlayback() {
     const label = document.createElement('label'), text = document.createElement('span'), select = document.createElement('select');
     text.textContent = `${t('五線')} ${staff.id} · ${t('音部記号')}`;
     select.append(new Option(t('ト音記号'), 'treble'), new Option(t('ヘ音記号'), 'bass'));
-    select.value = clefs[staff.id] || (staff.id % 2 ? 'treble' : 'bass');
-    select.addEventListener('change', () => { clefs[staff.id] = select.value; updateScore(); });
+    select.value = clefs[`${currentPage}:${staff.id}`] || (staff.id % 2 ? 'treble' : 'bass');
+    select.addEventListener('change', () => { clefs[`${currentPage}:${staff.id}`] = select.value; updateScore(); });
     label.append(text, select); $('clefs').append(label);
   }
   $('playback-status').textContent = result ? t('推定音高は要確認') : '';
@@ -292,6 +292,7 @@ for (const id of ['view', 'debug', 'show-staves', 'show-lines', 'show-components
 $('actual-size').addEventListener('change', () => $('canvas-stack').classList.toggle('actual', $('actual-size').checked));
 $('tempo').addEventListener('change', () => { if ($('tempo').checkValidity()) renderPlayback(); });
 $('chord-tolerance').addEventListener('change', () => { if ($('chord-tolerance').checkValidity()) updateScore(); });
+$('key-signature').addEventListener('change', updateScore);
 for (const id of ['include-right', 'include-left']) $(id).addEventListener('change', updateScore);
 $('play').addEventListener('click', async () => {
   if (!events.length || !$('tempo').checkValidity()) return;
