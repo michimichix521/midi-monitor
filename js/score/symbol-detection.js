@@ -14,21 +14,35 @@ function componentAt(components, head, spacing) {
   return candidates.sort((a, b) => (head.x - (a.x + a.width)) - (head.x - (b.x + b.width)))[0];
 }
 
-function accidentalKind(component, spacing) {
+function accidentalKind(component, spacing, binary, width) {
   const w = component.width / spacing, h = component.height / spacing;
-  // A sharp is normally wider and has two crossing horizontal strokes. Flats and
-  // naturals are narrow, so they remain lower-confidence until editable.
-  if (w >= .52 && h >= .72) return {value: 1, kind: 'sharp', confidence: .7};
+  const rows = [], columns = [];
+  for (let y = component.y; y < component.y + component.height; y++) {
+    let ink = 0;
+    for (let x = component.x; x < component.x + component.width; x++) ink += binary[y * width + x];
+    if (ink >= component.width * .58) rows.push(y);
+  }
+  for (let x = component.x; x < component.x + component.width; x++) {
+    let ink = 0;
+    for (let y = component.y; y < component.y + component.height; y++) ink += binary[y * width + x];
+    if (ink >= component.height * .5) columns.push(x);
+  }
+  const separated = values => values.some((value, index) => index && value - values[0] >= Math.max(2, values.length * .18));
+  // Apply a sharp only when the component really has two crossing horizontal
+  // and vertical strokes. Width/height alone confused text and nearby stems.
+  if (w >= .52 && h >= .72 && rows.length >= 2 && columns.length >= 2 && separated(rows) && separated(columns)) {
+    return {value: 1, kind: 'sharp', confidence: .88};
+  }
   if (w <= .58 && h >= .9) return {value: -1, kind: 'flat-or-natural', confidence: .52};
   return null;
 }
 
-export function detectAccidentals(components, heads, staves) {
+export function detectAccidentals(components, heads, staves, binary, width) {
   const staffMap = new Map(staves.map(staff => [staff.id, staff]));
   return heads.map(head => {
     if (!head.accepted) return head;
     const staff = staffMap.get(head.staff), component = componentAt(components, head, staff.spacing);
-    const accidental = component && accidentalKind(component, staff.spacing);
+    const accidental = component && accidentalKind(component, staff.spacing, binary, width);
     // Only a recognizably wide sharp is applied automatically. The narrow forms
     // are surfaced for review rather than silently changing the pitch.
     return accidental ? {...head, detectedAccidental: accidental,

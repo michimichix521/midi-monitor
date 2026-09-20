@@ -240,7 +240,7 @@ $('analyze').addEventListener('click', () => {
     }
   }
   try {
-    worker = new Worker(new URL('./analysis-worker.js?v=3', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./analysis-worker.js?v=4', import.meta.url), {type: 'module'});
     busy = true; result = null; selected = null; controls(); choose(null);
     const stages = {preprocess: 'グレースケール化・二値化を行っています…', staves: '五線を検出しています…',
       components: '黒画素の塊を検出しています…', heads: '音符頭の候補を探しています…'};
@@ -262,7 +262,7 @@ $('analyze').addEventListener('click', () => {
 });
 function analyzeCanvas(canvas, page) {
   return new Promise((resolve, reject) => {
-    worker = new Worker(new URL('./analysis-worker.js?v=3', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./analysis-worker.js?v=4', import.meta.url), {type: 'module'});
     worker.onmessage = ({data}) => {
       if (data.type === 'progress') status(`${page} / ${pageCount} ${t('解析中')}…`);
       if (data.type === 'result') { worker.terminate(); worker = null; resolve(data.result); }
