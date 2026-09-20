@@ -38,9 +38,15 @@ export function readMidiScore(buffer) {
   }
   notes.sort((a, b) => a.startBeat - b.startBeat || a.midi - b.midi);
   const events = [];
+  // Different MIDI tracks often carry the two piano hands and can differ by a
+  // few ticks after quantization. Treat onsets within a 1/32-note window as one
+  // chord so the player starts both hands together.
+  const onsetTolerance = 1 / 8;
   for (const note of notes) {
     const previous = events[events.length - 1];
-    if (previous && Math.abs(previous.startBeat - note.startBeat) < .0001) { previous.notes.push(note); previous.durationBeat = Math.max(previous.durationBeat, note.durationBeat); }
+    if (previous && Math.abs(previous.startBeat - note.startBeat) <= onsetTolerance) {
+      previous.notes.push(note); previous.durationBeat = Math.max(previous.durationBeat, note.durationBeat);
+    }
     else events.push({startBeat: note.startBeat, durationBeat: note.durationBeat, notes: [note]});
   }
   return {tempo, timeSignature: signature, notes, events};
