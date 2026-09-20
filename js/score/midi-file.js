@@ -54,23 +54,27 @@ export function readMidiScore(buffer) {
 
 export function synchronizeHands(score) {
   const measureLength = score.timeSignature.numerator * 4 / score.timeSignature.denominator;
-  const rightOnsets = score.notes.filter(note => note.hand === 'right').map(note => note.startBeat);
-  const notes = score.notes.map(note => {
-    if (note.hand !== 'left') return {...note};
+  const byMeasure = new Map();
+  for (const note of score.notes) {
     const measure = Math.floor(note.startBeat / measureLength);
-    const candidates = rightOnsets.filter(onset => Math.floor(onset / measureLength) === measure);
-    const closest = candidates.reduce((best, onset) => !best || Math.abs(onset - note.startBeat) < Math.abs(best - note.startBeat) ? onset : best, null);
-    // The explicit synchronization option treats each measure as a simultaneous
-    // two-hand phrase. Separate left/right exports can place matching onsets far
-    // apart in the event stream, so no distance limit is applied here.
-    return closest !== null ? {...note, startBeat: closest} : {...note};
-  });
-  const events = [];
-  for (const note of notes.sort((a, b) => a.startBeat - b.startBeat || a.midi - b.midi)) {
-    const previous = events[events.length - 1];
-    if (previous && Math.abs(previous.startBeat - note.startBeat) < .0001) {
-      previous.notes.push(note); previous.durationBeat = Math.max(previous.durationBeat, note.durationBeat);
-    } else events.push({startBeat: note.startBeat, durationBeat: note.durationBeat, notes: [note]});
+    if (!byMeasure.has(measure)) byMeasure.set(measure, {right: new Map(), left: new Map()});
+    const hand = note.hand === 'left' ? 'left' : 'right', columns = byMeasure.get(measure)[hand];
+    if (!columns.has(note.startBeat)) columns.set(note.startBeat, []);
+    columns.get(note.startBeat).push(note);
   }
-  return {...score, notes, events};
+  const events = [];
+  for (const [measure, hands] of [...byMeasure].sort((a, b) => a[0] - b[0])) {
+    const columns = hand => [...hands[hand].entries()].sort((a, b) => a[0] - b[0]).map(([, notes]) => notes);
+    const right = columns('right'), left = columns('left'), count = Math.max(right.length, left.length);
+    const cell = measureLength / Math.max(1, count);
+    // Pair by musical order rather than by the original track timestamps. A
+    // one-hand column occupies one cell; it does not create an empty cell for
+    // the other hand. This is the compact two-hand playback mode.
+    for (let index = 0; index < count; index++) {
+      const notes = [...(right[index] || []), ...(left[index] || [])].map(note => ({...note,
+        startBeat: measure * measureLength + index * cell, durationBeat: cell}));
+      events.push({startBeat: measure * measureLength + index * cell, durationBeat: cell, notes});
+    }
+  }
+  return {...score, notes: events.flatMap(event => event.notes), events};
 }

@@ -6,7 +6,7 @@ import {prepareScore, buildPlaybackEvents} from './pitch.js?v=8';
 import {ScorePlayer} from './playback.js?v=2';
 import {ScoreMidiInput} from './midi-input.js';
 import {PerformanceJudge} from './judge.js';
-import {readMidiScore, synchronizeHands} from './midi-file.js?v=2';
+import {readMidiScore, synchronizeHands} from './midi-file.js?v=3';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
 const DEBUG = true;
@@ -113,6 +113,14 @@ function updateScore() {
   if (importedMidiScore) {
     const sourceEvents = $('sync-midi-hands').checked ? synchronizeHands(importedMidiScore).events : importedMidiScore.events;
     events = sourceEvents.map(event => ({...event, notes: event.notes.filter(note => note.hand === 'right' ? $('include-right').checked : $('include-left').checked)})).filter(event => event.notes.length);
+    if ($('sync-midi-hands').checked) {
+      let beat = 0;
+      events = events.map(event => {
+        const compact = {...event, startBeat: beat, notes: event.notes.map(note => ({...note, startBeat: beat}))};
+        beat += event.durationBeat;
+        return compact;
+      });
+    }
     $('tempo').value = importedMidiScore.tempo;
     renderPlayback(); controls(); return;
   }
