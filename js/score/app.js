@@ -6,7 +6,7 @@ import {prepareScore, buildPlaybackEvents} from './pitch.js?v=8';
 import {ScorePlayer} from './playback.js?v=2';
 import {ScoreMidiInput} from './midi-input.js';
 import {PerformanceJudge} from './judge.js';
-import {readMidiScore} from './midi-file.js?v=1';
+import {readMidiScore, synchronizeHands} from './midi-file.js?v=2';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
 const DEBUG = true;
@@ -111,7 +111,8 @@ function drawAllPreviewOverlays() {
 }
 function updateScore() {
   if (importedMidiScore) {
-    events = importedMidiScore.events.map(event => ({...event, notes: event.notes.filter(note => note.hand === 'right' ? $('include-right').checked : $('include-left').checked)})).filter(event => event.notes.length);
+    const sourceEvents = $('sync-midi-hands').checked ? synchronizeHands(importedMidiScore).events : importedMidiScore.events;
+    events = sourceEvents.map(event => ({...event, notes: event.notes.filter(note => note.hand === 'right' ? $('include-right').checked : $('include-left').checked)})).filter(event => event.notes.length);
     $('tempo').value = importedMidiScore.tempo;
     renderPlayback(); controls(); return;
   }
@@ -314,7 +315,7 @@ $('actual-size').addEventListener('change', () => $('canvas-stack').classList.to
 $('tempo').addEventListener('change', () => { if ($('tempo').checkValidity()) renderPlayback(); });
 $('chord-tolerance').addEventListener('change', () => { if ($('chord-tolerance').checkValidity()) updateScore(); });
 $('key-signature').addEventListener('change', updateScore);
-for (const id of ['include-right', 'include-left']) $(id).addEventListener('change', updateScore);
+for (const id of ['include-right', 'include-left', 'sync-midi-hands']) $(id).addEventListener('change', updateScore);
 $('play').addEventListener('click', async () => {
   if (!events.length || !$('tempo').checkValidity()) return;
   try {

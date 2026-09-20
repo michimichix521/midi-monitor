@@ -51,3 +51,25 @@ export function readMidiScore(buffer) {
   }
   return {tempo, timeSignature: signature, notes, events};
 }
+
+export function synchronizeHands(score) {
+  const measureLength = score.timeSignature.numerator * 4 / score.timeSignature.denominator;
+  const rightOnsets = score.notes.filter(note => note.hand === 'right').map(note => note.startBeat);
+  const notes = score.notes.map(note => {
+    if (note.hand !== 'left') return {...note};
+    const measure = Math.floor(note.startBeat / measureLength);
+    const candidates = rightOnsets.filter(onset => Math.floor(onset / measureLength) === measure);
+    const closest = candidates.reduce((best, onset) => !best || Math.abs(onset - note.startBeat) < Math.abs(best - note.startBeat) ? onset : best, null);
+    // Keep genuine long pauses intact. Nearby accompaniment onsets are aligned
+    // so independently exported left/right tracks do not alternate in playback.
+    return closest !== null && Math.abs(closest - note.startBeat) <= .75 ? {...note, startBeat: closest} : {...note};
+  });
+  const events = [];
+  for (const note of notes.sort((a, b) => a.startBeat - b.startBeat || a.midi - b.midi)) {
+    const previous = events[events.length - 1];
+    if (previous && Math.abs(previous.startBeat - note.startBeat) < .0001) {
+      previous.notes.push(note); previous.durationBeat = Math.max(previous.durationBeat, note.durationBeat);
+    } else events.push({startBeat: note.startBeat, durationBeat: note.durationBeat, notes: [note]});
+  }
+  return {...score, notes, events};
+}

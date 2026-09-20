@@ -105,6 +105,7 @@ const english = {
   ,'全{count}ページを表示しています…': 'Rendering all {count} pages…', '全{count}ページを縦に表示しました。先頭ページを解析するか、全ページ解析を選んでください。': 'All {count} pages are shown vertically. Analyze the first page or choose Analyze all pages.'
   ,'楽譜を解析': 'Analyze score', '全{count}ページを縦に表示しました。「楽譜を解析」を押してください。': 'All {count} pages are shown vertically. Click Analyze score.'
   ,'再生・採点する手': 'Hands to play and grade', '右手（ト音記号）': 'Right hand (treble)', '左手（ヘ音記号）': 'Left hand (bass)'
+  ,'MIDIの左右を同期する': 'Synchronize MIDI hands'
 };
 let language = 'ja';
 try { if (localStorage.getItem('midi-monitor-language') === 'en') language = 'en'; } catch {}
