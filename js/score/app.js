@@ -6,6 +6,7 @@ import {prepareScore, buildPlaybackEvents} from './pitch.js?v=8';
 import {ScorePlayer} from './playback.js?v=2';
 import {ScoreMidiInput} from './midi-input.js';
 import {PerformanceJudge} from './judge.js';
+import {readMidiScore} from './midi-file.js?v=1';
 
 // Turn off to start with an unobstructed score; the UI can override this setting.
 const DEBUG = true;
@@ -19,6 +20,7 @@ let statusKey = 'PDFを選択するか、サンプルを開いてください。
 let clefs = {}, events = [], isPlaying = false, addingNote = false, activeNote = null;
 const pageAnalyses = new Map();
 let midiConnected = false, judge = null, judging = false;
+let importedMidiScore = null;
 const midi = new ScoreMidiInput(handleMidi, names => {
   midiConnected = names.length > 0;
   $('midi-status').textContent = names.length ? `${t('MIDI接続済み')}：${names.join(', ')}` : t('MIDI入力が見つかりません');
@@ -108,6 +110,11 @@ function drawAllPreviewOverlays() {
   for (const [page, analysis] of pageAnalyses) if (page !== 1) drawPreviewOverlay(page, analysis);
 }
 function updateScore() {
+  if (importedMidiScore) {
+    events = importedMidiScore.events.map(event => ({...event, notes: event.notes.filter(note => note.hand === 'right' ? $('include-right').checked : $('include-left').checked)})).filter(event => event.notes.length);
+    $('tempo').value = importedMidiScore.tempo;
+    renderPlayback(); controls(); return;
+  }
   if (!result) { events = []; renderPlayback(); return; }
   result.playNotes = prepareScore(result, clefs, currentPage, $('key-signature').value);
   pageAnalyses.set(currentPage, result);
@@ -194,7 +201,7 @@ async function renderAllPages() {
 }
 async function loadPDF(bytes, name, sample = false) {
   busy = true; pageCount = 0; currentPage = 1; fileName = name; isSample = sample;
-  pageAnalyses.clear(); events = []; clefs = {};
+  pageAnalyses.clear(); events = []; clefs = {}; importedMidiScore = null;
   resetPage(); controls(); refreshText(); status('PDFを読み込んでいます…');
   try {
     pageCount = await pdf.open(bytes);
@@ -205,10 +212,19 @@ async function loadPDF(bytes, name, sample = false) {
 $('pdf-file').addEventListener('change', async () => {
   const file = $('pdf-file').files[0];
   if (!file || busy) return;
-  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') { status('PDFファイルを選択してください。', {}, true); return; }
+  const isMidiFile = /\.(mid|midi)$/i.test(file.name) || /midi/i.test(file.type);
+  if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf' && !isMidiFile) { status('PDFまたはMIDIファイルを選択してください。', {}, true); return; }
   if (file.size > 40 * 1024 * 1024) { status('PDFは40 MB以下にしてください。', {}, true); return; }
   busy = true; controls(); status('PDFを読み込んでいます…');
-  try { await loadPDF(new Uint8Array(await file.arrayBuffer()), file.name); }
+  try {
+    const bytes = await file.arrayBuffer();
+    if (isMidiFile) {
+      resetPage(); pageAnalyses.clear(); importedMidiScore = readMidiScore(bytes); fileName = file.name; isSample = false; pageCount = 0;
+      $('tempo').value = importedMidiScore.tempo; $('filename').textContent = file.name;
+      status('MIDIを読み込みました：{notes}音、BPM {tempo}。再生または採点できます。', {notes: importedMidiScore.notes.length, tempo: importedMidiScore.tempo});
+      updateScore();
+    } else await loadPDF(new Uint8Array(bytes), file.name);
+  }
   catch (error) { busy = false; controls(); pdfError(error); }
   finally { $('pdf-file').value = ''; }
 });
@@ -360,7 +376,8 @@ $('export').addEventListener('click', () => {
 });
 $('export-score').addEventListener('click', () => {
   if (!events.length) return;
-  const data = {tempo: Number($('tempo').value), timeSignature: {numerator: 4, denominator: 4}, notes: events.flatMap(event => event.notes.map(note => ({id: note.id, midi: note.midi, startBeat: event.startBeat, durationBeat: note.durationBeat, measure: Math.floor(event.startBeat / 4) + 1, staff: note.staff, hand: note.hand, confidence: note.confidence})))};
+  const timeSignature = importedMidiScore?.timeSignature || {numerator: 4, denominator: 4};
+  const data = {tempo: Number($('tempo').value), timeSignature, notes: events.flatMap(event => event.notes.map(note => ({id: note.id, midi: note.midi, startBeat: event.startBeat, durationBeat: note.durationBeat, measure: Math.floor(event.startBeat / timeSignature.numerator) + 1, staff: note.staff, hand: note.hand, confidence: note.confidence})))};
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'}));
   const link = document.createElement('a'); link.href = url; link.download = `score-playback-page-${currentPage}.json`;
   document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
